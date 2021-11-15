@@ -1,15 +1,19 @@
 # yaftp
 Yet Another File Transfer Protocol.
 
-# Protocol
+# Build & Run
 
-## Features
+`$> cargo build --release`
+
+# Features
 
 * C2C
 * Lightweight
 * Per something per session
 * High performence
 * Resume broken transfer
+
+# Protocol
 
 ## Handshake Request
 
@@ -59,7 +63,7 @@ yaftp will reply server version and support methods.
 
 ```
 +-------+-------+
-|CMD    | NARG  |
+|  CMD  | NARG  |
 +-------+-------+
 | 1(u8) | 1(u8) |
 +-------+-------+
@@ -104,7 +108,7 @@ server received command arguments will check if valid and reply a code and argum
 |  RETCODE  |  NARG     |
 +-----------+-----------+
 |  1(u8)    |  1(u8)    |
-+-------- --+-----------+
++-----------+-----------+
 ```
 
 if check vaild return 0x00 , else return 1~255.
@@ -113,16 +117,20 @@ if check vaild return 0x00 , else return 1~255.
 +-----------+-----------------------------+
 |  RETCODE  |  Reason                     |
 +-----------+-----------------------------+
-|  1        |  No permission              |
-+-------- --+-----------------------------+
-|  2        |  source path not found      |
-+-------- --+-----------------------------+
-|  3        |  start pos unvalid          |
-+-------- --+-----------------------------+
-|  4        |  end pos unvalid            |
-+-------- --+-----------------------------+
-|  5        |  check hash faild           |
-+-------- --+-----------------------------+
+|  1        |  not support the version    |
++-----------+-----------------------------+
+|  2        |  not support the command    |
++-----------+-----------------------------+
+|  3        |  No permission              |
++-----------+-----------------------------+
+|  4        |  source path not found      |
++-----------+-----------------------------+
+|  5        |  start pos unvalid          |
++-----------+-----------------------------+
+|  6        |  end pos unvalid            |
++-----------+-----------------------------+
+|  7        |  check hash faild           |
++-----------+-----------------------------+
 ```
 
 Note : The yaftp protocol is full-duplex, so depending on the command, the returned data may not be returned until the command parameters are completely sent. Therefore, the returned data needs to be processed asynchronously. For example: after the put method submits the first three parameters, it may directly return a non-zero retcode. 
@@ -213,7 +221,7 @@ command `put` if retcode eq 0 will return a md5 hash after transfer finished.
 
 command `get` if retcode eq 0 will return request file data md5 hash , then server will send client request data.
 
-### Finally
+## Finally
 
 Server will close the session connection.
 
