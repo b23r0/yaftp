@@ -18,16 +18,16 @@ Yet Another File Transfer Protocol.
 ## Handshake Request
 
 ```
-+----+----------+----------+
-|VER | NMETHODS | METHODS  |
-+----+----------+----------+
-| 1  |    1     | 1 to 255 |
-+----+----------+----------+
++-------+----------+---------------+
+|  VER  | NMETHODS | METHODS       |
++-------+----------+---------------+
+| 1(u8) |   1(u8)  | 1 to 255 (u8) |
++-------+----------+---------------+
 ```
 
 fisrt , client will send client version and support methods . 
 
-In yaftp version 1.0 , only support 6 methods.
+In yaftp version 1.0 , only support 8 methods.
 
 ```
 +-----+-----------+
@@ -35,26 +35,30 @@ In yaftp version 1.0 , only support 6 methods.
 +-----+-----------+
 | ls  |   0x01    |
 +-----+-----------+
-| cp  |   0x02    |
+| cwd |   0x02    |
 +-----+-----------+
-| mv  |   0x03    |
+| cp  |   0x03    |
 +-----+-----------+
-| rm  |   0x04    |
+| mkd |   0x04    |
 +-----+-----------+
-| put |   0x05    |
+| mv  |   0x05    |
 +-----+-----------+
-| get |   0x06    |
+| rm  |   0x06    |
++-----+-----------+
+| put |   0x07    |
++-----+-----------+
+| get |   0x08    |
 +-----+-----------+
 ```
 
 ## Handshake Reply
 
 ```
-+----+----------+----------+
-|VER | NMETHODS | METHODS  |
-+----+----------+----------+
-| 1  |    1     | 1 to 255 |
-+----+----------+----------+
++-------+----------+---------------+
+|  VER  | NMETHODS | METHODS       |
++-------+----------+---------------+
+| 1(u8) |   1(u8)  | 1 to 255 (u8) |
++-------+----------+---------------+
 ```
 
 yaftp will reply server version and support methods.
@@ -77,7 +81,7 @@ if command has two arguments and above,  client will keep send argument message 
 +-----------------+---------------------+
 | NEXT_ARG_SIZE   |         ARG         |
 +-----------------+---------------------+
-|      4(u32)     |       Variable      |
+|      4(u64)     |       Variable      |
 +-----------------+---------------------+
 ```
 
@@ -86,18 +90,22 @@ next , we need know every command argument and type.
 ## Command Arguments
 
 ```
-|---------+------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------|
-| Command | NArg | Arg1                  | Arg2                  | Arg3                  | Arg4                  | Arg5                  |
-|---------|------|-----------------------|-----------------------|-----------------------|-----------------------+-----------------------|
-| ls      | 1    | path [string]         |                       |                       |                       |                       |
-| cp      | 2    | source path [string]  | target path [string]  |                       |                       |                       |
-| mv      | 2    | source path [string]  | target path [string]  |                       |                       |                       |
-| rm      | 1    | path [string]         |                       |                       |                       |                       |
-| rm      | 1    | path [string]         |                       |                       |                       |                       |
-| put     | 4    | path [string]         | md5[u32]              | start_pos[u128]       | end_pos[u128]         | data[stream]          |
-| get     | 4    | path [string]         | start_pos[u128]       | end_pos[u128]         |                       |                       |
-|---------+------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------|
+|---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------|
+| Command | NArg | Arg1                            | Arg2                  | Arg3                  | Arg4                  | Arg5                  |
+|---------|------|---------------------------------|-----------------------|-----------------------|-----------------------+-----------------------|
+| ls      | 1    | path [string](max 1024)         |                       |                       |                       |                       |
+| cwd     | 0    |                                 |                       |                       |                       |                       |
+| cp      | 2    | source path [string]            | target path [string]  |                       |                       |                       |
+| mkd     | 1    | path [string]                   |                       |                       |                       |                       |
+| mv      | 2    | source path [string]            | target path [string]  |                       |                       |                       |
+| rm      | 1    | path [string]                   |                       |                       |                       |                       |
+| rm      | 1    | path [string]                   |                       |                       |                       |                       |
+| put     | 4    | path [string]                   | md5[u32]              | start_pos[u64]        | end_pos[u64]          | data[stream]          |
+| get     | 4    | path [string]                   | start_pos[u64]        | end_pos[u64]          |                       |                       |
+|---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------|
 ```
+
+Note : all path max size < 1024 bytes. you need check it.
 
 ## Command Reply
 
@@ -143,7 +151,7 @@ command reply arguments same with command arguments.
 +-----------------+---------------------+
 | NEXT_ARG_SIZE   |         ARG         |
 +-----------------+---------------------+
-|      4(u32)     |       Variable      |
+|      4(u64)     |       Variable      |
 +-----------------+---------------------+
 ```
 
@@ -161,19 +169,43 @@ command `ls` will return a table like ls list. First argument is columns use `|`
 
 others arguments is rows(use '|' split).
 
-### cp - 0x02
+### cwd - 0x02
+
+```
+|---------+-----------+-----------------------+
+| Command | NArg      | Arg1                  |
+|---------|-----------|-----------------------+
+| cwd     | 0 or 1    | path(string)          |
+|---------+-----------+-----------------------+
+```
+
+command `cwd` just return a code tell client if success.
+
+### cp - 0x03
 
 ```
 |---------+------+
 | Command | NArg |
 |---------|------|
-| ls      | 0    |
+| cp      | 0    |
 |---------+------+
 ```
 
 command `cp` just return a code tell client if success.
 
-### mv - 0x03
+### mkd - 0x04
+
+```
+|---------+------+
+| Command | NArg |
+|---------|------|
+| mkd     | 0    |
+|---------+------+
+```
+
+command `mkd` just return a code tell client if success.
+
+### mv - 0x05
 
 ```
 |---------+------+
@@ -185,7 +217,7 @@ command `cp` just return a code tell client if success.
 
 command `mv` just return a code tell client if success.
 
-### rm - 0x04
+### rm - 0x06
 
 ```
 |---------+------+
@@ -197,7 +229,7 @@ command `mv` just return a code tell client if success.
 
 command `rm` just return a code tell client if success.
 
-### put - 0x05
+### put - 0x07
 
 ```
 |---------+-----------+-----------------------+
@@ -209,7 +241,7 @@ command `rm` just return a code tell client if success.
 
 command `put` if retcode eq 0 will return a md5 hash after transfer finished.
 
-### get - 0x06
+### get - 0x08
 
 ```
 |---------+-----------+-----------------------+-----------------------|

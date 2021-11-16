@@ -5,6 +5,8 @@ use futures::select;
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
+mod server;
+
 fn usage() {
 
 }
@@ -47,6 +49,7 @@ async fn main() -> io::Result<()>  {
 			while let Some(stream) = incoming.next().await {
 				let stream = stream?;
 				task::spawn(async {
+					server::yaftp_server_handle(stream).await;
 				});
 			}
 		},
