@@ -66,11 +66,11 @@ yaftp will reply server version and support methods.
 ## Send Command
 
 ```
-+-------+-------+
-|  CMD  | NARG  |
-+-------+-------+
-| 1(u8) | 1(u8) |
-+-------+-------+
++-------+--------+
+|  CMD  | NARG   |
++-------+--------+
+| 1(u8) | 4(u32) |
++-------+--------+
 ```
 
 client send command message to server , tell server command type , arguments count , and next argument size.
@@ -115,7 +115,7 @@ server received command arguments will check if valid and reply a code and argum
 +-----------+-----------+
 |  RETCODE  |  NARG     |
 +-----------+-----------+
-|  1(u8)    |  1(u8)    |
+|  1(u8)    |  4(u32)   |
 +-----------+-----------+
 ```
 
@@ -138,6 +138,16 @@ if check vaild return 0x00 , else return 1~255.
 |  6        |  end pos unvalid            |
 +-----------+-----------------------------+
 |  7        |  check hash faild           |
++-----------+-----------------------------+
+|  8        |  argument count unvaild     |
++-----------+-----------------------------+
+|  9        |  argument unvaild           |
++-----------+-----------------------------+
+|  10       |  argument size unvaild      |
++-----------+-----------------------------+
+|  11       |  read folder faild          |
++-----------+-----------------------------+
+|  12       |  argument size unvaild      |
 +-----------+-----------------------------+
 ```
 
