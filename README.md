@@ -47,28 +47,30 @@ Yet Another File Transfer Protocol.
 
 fisrt , client will send client version and support methods . 
 
-In yaftp version 1.0 , only support 8 methods.
+In yaftp version 1.0 , only support 9 methods.
 
 ```
-+-----+-----------+
-| CMD |   VALUE   |
-+-----+-----------+
-| ls  |   0x01    |
-+-----+-----------+
-| cwd |   0x02    |
-+-----+-----------+
-| cp  |   0x03    |
-+-----+-----------+
-| mkd |   0x04    |
-+-----+-----------+
-| mv  |   0x05    |
-+-----+-----------+
-| rm  |   0x06    |
-+-----+-----------+
-| put |   0x07    |
-+-----+-----------+
-| get |   0x08    |
-+-----+-----------+
++------+-----------+
+| CMD  |   VALUE   |
++------+-----------+
+| ls   |   0x01    |
++------+-----------+
+| cwd  |   0x02    |
++------+-----------+
+| cp   |   0x03    |
++------+-----------+
+| mkd  |   0x04    |
++------+-----------+
+| mv   |   0x05    |
++------+-----------+
+| rm   |   0x06    |
++------+-----------+
+| put  |   0x07    |
++------+-----------+
+| get  |   0x08    |
++------+-----------+
+| type |   0x09    |
++------+-----------+
 ```
 
 ## Handshake Reply
@@ -122,6 +124,7 @@ next , we need know every command argument and type.
 | rm      | 1    | path [string]                   |                       |                       |                       |                       |
 | put     | 4    | path [string]                   | md5[u32]              | start_pos[u64]        | end_pos[u64]          | data[stream]          |
 | get     | 4    | path [string]                   | start_pos[u64]        | end_pos[u64]          |                       |                       |
+| type    | 1    | path [string](max 1024)         |                       |                       |                       |                       |
 +---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 ```
 
@@ -278,6 +281,18 @@ command `put` if retcode eq 0 will return a md5 hash after transfer finished.
 ```
 
 command `get` if retcode eq 0 will return request file data md5 hash , then server will send client request data.
+
+### type - 0x09
+
+```
++---------+-----------+-----------------------+-----------------------+
+| Command | NArg      | Arg1                  | Arg2                  |
++---------+-----------+-----------------------+-----------------------+
+| type    | 0 or 1    | u8                    | data[stream]          |
++---------+-----------+-----------------------+-----------------------+
+```
+
+command `type` if retcode eq 0 will return filetype : 0 is folder , 1 is file , 2 is symlink , other is others.
 
 ## Finally
 

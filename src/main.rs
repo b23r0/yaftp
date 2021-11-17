@@ -100,7 +100,7 @@ async fn main() -> io::Result<()>  {
 
 				if cmd == "ls" {
 					let mut client = client::Client::new(ip.clone() , port.clone()).await?;
-					let result = client.ls(String::from(".")).await?;
+					let result = client.ls(String::from(cwd.clone())).await?;
 
 					let mut files : Vec<FileInfo> = vec![];
 
