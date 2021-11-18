@@ -1,24 +1,14 @@
 include!{"utils.rs"}
 
-use std::{fs, io::Error, net::Shutdown};
+use crate::common::{YaftpError, error_retcode};
+use std::{fs, net::Shutdown};
 
-use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt};
 use async_std::{net::{TcpStream}};
+use chrono::DateTime;
+use chrono::offset::Utc;
 
-fn check_support_methods(methods : &[u8]) -> bool {
-	
-	let mut i = 0 ;
-	while i < methods.len() {
-		if methods[i] > 0x08 {
-			return false;
-		}
-		i += 1;
-	}
-	
-	true
-}
-
-async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, Error> {
+async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, YaftpError> {
 	/*
 	+-----------+-----------+
 	|  RETCODE  |  NARG	    |
@@ -35,14 +25,14 @@ async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Resu
 		Ok(_) => {},
 		Err(e) => {
 			log::error!("error : {}" , e);
-			return Err(e);
+			return Err(YaftpError::UnknownNetwordError);
 		},
 	};
 
 	Ok(args)
 }
 
-async fn send_argument(stream :&mut  TcpStream , data :&mut Vec<u8>) -> Result<Vec<u8>, Error>{
+async fn send_argument(stream :&mut  TcpStream , data :&mut Vec<u8>) -> Result<Vec<u8>, YaftpError>{
 	/*
 	+-----------------+---------------------+
 	| NEXT_ARG_SIZE   |	      ARG           |
@@ -60,13 +50,13 @@ async fn send_argument(stream :&mut  TcpStream , data :&mut Vec<u8>) -> Result<V
 		Ok(_) => {},
 		Err(e) => {
 			log::error!("error : {}" , e);
-			return Err(e);
+			return Err(YaftpError::UnknownNetwordError);
 		},
 	};
 	Ok(argument)
 }
 
-async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u8>, Error> {
+async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u8>, YaftpError> {
 	/*
 	+-----------------+---------------------+
 	| NEXT_ARG_SIZE   |      ARG            |
@@ -79,7 +69,7 @@ async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u
 		Ok(_) => {},
 		Err(e) => {
 			log::error!("error : {}" , e);
-			return Err(e);
+			return Err(YaftpError::UnknownNetwordError);
 		},
 	};
 
@@ -87,7 +77,7 @@ async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u
 
 	if size > max_size {
 		log::error!("argument size error : {}" , size);
-		return Err(Error::new(std::io::ErrorKind::InvalidData, "argument size error"));
+		return Err(YaftpError::ArgumentUnvalid);
 	}
 
 	let mut arg = vec![0u8;size as usize].into_boxed_slice();
@@ -96,36 +86,44 @@ async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u
 		Ok(_) => {},
 		Err(e) => {
 			log::error!("error : {}" , e);
-			return Err(e);
+			return Err(YaftpError::UnknownNetwordError);
 		},
 	};
 
 	Ok(arg.to_vec())
 }
 
-async fn c_ls(stream :&mut  TcpStream, narg : u32) {
+async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 
-	let mut ret = 0u8;
+	let mut ret = error_retcode(YaftpError::OK);
 
 	if narg != 1 {
 		log::error!("command [{}] arguments count unvalid : {}" , "ls", narg);
-		ret = 8;
-		return;
+		ret = error_retcode(YaftpError::ArgumentUnvalid);
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(e) => {
+				ret = error_retcode(e);
+			},
+		};
+
+		return ret;
 	}
 
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(e) => {
-				ret = 8;
-				return;
+			Err(_) => {
+				ret = error_retcode(YaftpError::UnknownNetwordError);
+				break;
 			}
 		};
 
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
-			Err(e) => {
-				ret = 8;
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
 				break;
 			},
 		};
@@ -133,7 +131,7 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 		let paths = match fs::read_dir(path){
 			Ok(p) => p,
 			Err(_) => {
-				ret = 9;
+				ret = error_retcode(YaftpError::ReadFolderFaild);
 				break;
 			},
 		};
@@ -141,10 +139,15 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 		let mut rows1 : Vec<String> = Vec::new();
 		let mut rows2 : Vec<String> = Vec::new();
 		let mut rows3 : Vec<String> = Vec::new();
+		let mut rows4 : Vec<String> = Vec::new();
 
 		for path in paths {
 			let path = path.unwrap();
 			let filename = String::from(path.file_name().to_str().unwrap());
+			let mt = path.metadata().unwrap().modified().unwrap();
+
+			let mt: DateTime<Utc> = mt.into();
+
 			rows1.push(filename);
 
 			let t = path.file_type().unwrap();
@@ -158,9 +161,11 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 				rows2.push(String::from("other"));
 			}
 			rows3.push(path.metadata().unwrap().len().to_string());
+
+			rows4.push(mt.format("%Y-%m-%d %H:%M:%S").to_string());
 		}
 
-		if ret == 0 {
+		if ret == error_retcode(YaftpError::OK) {
 
 			match send_reply(stream, 0 , rows1.len() as u32).await {
 				Ok(_) => {},
@@ -172,11 +177,12 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 			let mut i = 0 ;
 
 			while i < rows1.len(){
-				let full = [rows1[i].clone() , rows2[i].clone(), rows3[i].clone()].join("|");
+				let full = [rows1[i].clone() , rows2[i].clone(), rows3[i].clone() , rows4[i].clone()].join("|");
 				match send_argument(stream, &mut full.as_bytes().to_vec()).await {
 					Ok(_) => {},
 					Err(e) => {
-						log::error!("error : {}" , e);
+						log::error!("yaftp send argument error");
+						ret = error_retcode(e);
 						break;
 					},
 				};
@@ -187,7 +193,69 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 		break;
 	}
 
-	if ret != 0{
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+	ret
+
+}
+
+async fn c_cwd(stream :&mut  TcpStream, narg : u32) -> u8 {
+
+	let mut ret = error_retcode(YaftpError::OK);
+
+	if narg != 0 {
+		log::error!("command [{}] arguments count unvalid : {}" , "ls", narg);
+		ret = error_retcode(YaftpError::ArgumentUnvalid);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(e) => {
+				ret = error_retcode(e);
+			},
+		};
+		return ret;
+	}
+
+	loop {
+		let paths = match  std::env::current_dir(){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ReadCwdFaild);
+				break;
+			},
+		};
+
+		let path = paths.to_str().unwrap();
+
+		if ret == error_retcode(YaftpError::OK) {
+
+			match send_reply(stream, 0 , 1).await {
+				Ok(_) => {},
+				Err(e) => {
+					ret = error_retcode(e);
+					break;
+				},
+			};
+
+			match send_argument(stream, &mut path.as_bytes().to_vec()).await {
+				Ok(_) => {},
+				Err(e) => {
+					ret = error_retcode(e);
+					break;
+				},
+			};
+		}
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
 		/*
 		+-----------+-----------+
 		|  RETCODE  |  NARG	    |
@@ -198,46 +266,127 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) {
 
 		match send_reply(stream, ret , 0).await {
 			Ok(_) => {},
-			Err(_) => {
+			Err(e) => {
+				ret = error_retcode(e);
 			},
 		};
 	}
 
+	ret
+
 }
 
-async fn c_cwd(stream :&mut  TcpStream, narg : u32) {
+async fn c_info(stream :&mut  TcpStream, narg : u32) {
 
 	let mut ret = 0u8;
 
-	if narg != 0 {
+	if narg != 1 {
 		log::error!("command [{}] arguments count unvalid : {}" , "ls", narg);
-		ret = 8;
+		ret = error_retcode(YaftpError::ArgumentUnvalid);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
 		return;
 	}
 
 	loop {
-		let paths = match  std::env::current_dir(){
+		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
 			Err(_) => {
-				ret = 10;
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let path = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
 				break;
 			},
 		};
 
-		let path = paths.to_str().unwrap();
+		let info = match fs::metadata(path){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				}
+				break;
+			},
+		};
 
-		if ret == 0 {
+		let mut t : u8 = 0xff;
 
-			match send_reply(stream, 0 , 1).await {
+		if info.is_dir() {
+			t = 0;
+		} else if info.is_file() {
+			t = 1;
+		} else {
+			t = 0xff;
+		}
+
+		let size : u64 = info.len();
+
+		let mt =  info.modified().unwrap();
+		let mt: DateTime<Utc> = mt.into();
+		let mt : u64 = mt.timestamp().try_into().unwrap();
+
+		let at =  info.accessed().unwrap();
+		let at: DateTime<Utc> = at.into();
+		let at : u64 = at.timestamp().try_into().unwrap();
+
+		if ret == error_retcode(YaftpError::OK) {
+
+			match send_reply(stream, 0 , 4).await {
 				Ok(_) => {},
-				Err(_) => {
+				Err(e) => {
+					ret = error_retcode(e);
 					break;
 				},
 			};
 
-			match send_argument(stream, &mut path.as_bytes().to_vec()).await {
+			match send_argument(stream, &mut [t].to_vec()).await {
 				Ok(_) => {},
-				Err(_) => {
+				Err(e) => {
+					log::error!("yaftp send argument error");
+					ret = error_retcode(e);
+					break;
+				},
+			};
+
+			let mut size = size.to_be_bytes().to_vec();
+
+			match send_argument(stream, &mut size).await {
+				Ok(_) => {},
+				Err(e) => {
+					log::error!("yaftp send argument error");
+					ret = error_retcode(e);
+					break;
+				},
+			};
+
+			let mut mt = mt.to_be_bytes().to_vec();
+
+			match send_argument(stream, &mut mt).await {
+				Ok(_) => {},
+				Err(e) => {
+					log::error!("yaftp send argument error");
+					ret = error_retcode(e);
+					break;
+				},
+			};
+
+			let mut at = at.to_be_bytes().to_vec();
+
+			match send_argument(stream, &mut at).await {
+				Ok(_) => {},
+				Err(e) => {
+					log::error!("yaftp send argument error");
+					ret = error_retcode(e);
 					break;
 				},
 			};
@@ -246,14 +395,7 @@ async fn c_cwd(stream :&mut  TcpStream, narg : u32) {
 		break;
 	}
 
-	if ret != 0{
-		/*
-		+-----------+-----------+
-		|  RETCODE  |  NARG	    |
-		+-----------+-----------+
-		|  1(u8)    |  4(u32)   |
-		+-----------+-----------+
-		*/
+	if ret != error_retcode(YaftpError::OK){
 
 		match send_reply(stream, ret , 0).await {
 			Ok(_) => {},
@@ -341,8 +483,12 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 		let narg = u32::from_be_bytes(command[1..5].try_into().unwrap());
 
 		match command[0] {
-			0x01 => c_ls(&mut stream , narg ).await,
-			0x02 => c_cwd(&mut stream , narg ).await,
+			0x01 => {
+				let _ = c_ls(&mut stream , narg ).await;
+			},
+			0x02 => {
+				let _ = c_cwd(&mut stream , narg ).await;
+			},
 			_ => {
 				log::error!("not support command {}" , command[0]);
 				break;

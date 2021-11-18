@@ -152,9 +152,9 @@ if check vaild return 0x00 , else return 1~255.
 +-----------+-----------------------------+
 |  2        |  not support the command    |
 +-----------+-----------------------------+
-|  3        |  No permission              |
+|  3        |  no permission              |
 +-----------+-----------------------------+
-|  4        |  source path not found      |
+|  4        |  not found                  |
 +-----------+-----------------------------+
 |  5        |  start pos unvalid          |
 +-----------+-----------------------------+
@@ -282,17 +282,17 @@ command `put` if retcode eq 0 will return a md5 hash after transfer finished.
 
 command `get` if retcode eq 0 will return request file data md5 hash , then server will send client request data.
 
-### type - 0x09
+### info - 0x09
 
 ```
-+---------+-----------+-----------------------+-----------------------+
-| Command | NArg      | Arg1                  | Arg2                  |
-+---------+-----------+-----------------------+-----------------------+
-| type    | 0 or 1    | u8                    | data[stream]          |
-+---------+-----------+-----------------------+-----------------------+
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Command | NArg      | Arg1                  | Arg2                  | Arg3                  | Arg3                  |
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
+| info    | 0 or 3    | u8                    | u64                   | u64                   | u64                   |
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
 ```
 
-command `type` if retcode eq 0 will return filetype : 0 is folder , 1 is file , 2 is symlink , other is others.
+command `info` if retcode eq 0 will return arg1 (filetype : 0 is folder , 1 is file , other is others) , arg2(filesize) , arg3 (file last modify timestamp) , arg3 (file last accessed timestamp).
 
 ## Finally
 
