@@ -140,13 +140,17 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 		let mut rows2 : Vec<String> = Vec::new();
 		let mut rows3 : Vec<String> = Vec::new();
 		let mut rows4 : Vec<String> = Vec::new();
+		let mut rows5 : Vec<String> = Vec::new();
 
 		for path in paths {
 			let path = path.unwrap();
 			let filename = String::from(path.file_name().to_str().unwrap());
-			let mt = path.metadata().unwrap().modified().unwrap();
 
+			let mt = path.metadata().unwrap().modified().unwrap();
 			let mt: DateTime<Utc> = mt.into();
+
+			let at = path.metadata().unwrap().accessed().unwrap();
+			let at: DateTime<Utc> = at.into();
 
 			rows1.push(filename);
 
@@ -163,6 +167,7 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 			rows3.push(path.metadata().unwrap().len().to_string());
 
 			rows4.push(mt.format("%Y-%m-%d %H:%M:%S").to_string());
+			rows5.push(at.format("%Y-%m-%d %H:%M:%S").to_string());
 		}
 
 		if ret == error_retcode(YaftpError::OK) {
@@ -177,7 +182,7 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 			let mut i = 0 ;
 
 			while i < rows1.len(){
-				let full = [rows1[i].clone() , rows2[i].clone(), rows3[i].clone() , rows4[i].clone()].join("|");
+				let full = [rows1[i].clone() , rows2[i].clone(), rows3[i].clone() , rows4[i].clone() , rows5[i].clone()].join("|");
 				match send_argument(stream, &mut full.as_bytes().to_vec()).await {
 					Ok(_) => {},
 					Err(e) => {

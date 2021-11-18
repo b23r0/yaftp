@@ -9,18 +9,20 @@ use simple_logger::SimpleLogger;
 mod server;
 mod client;
 mod common;
+mod cmd;
 use console::Term;
 use console::style;
 use tabled::{Tabled, Table};
 
-use crate::common::error_retcode;
+use crate::{cmd::CmdError, common::error_retcode};
 
 #[derive(Tabled)]
 struct FileInfo {
     name: String,
 	typ: String,
 	size: String,
-	modified : String
+	modified : String,
+	accesstime : String
 }
 
 fn usage() {
@@ -101,15 +103,17 @@ async fn main() -> io::Result<()>  {
 				term.write_all(wt.as_bytes()).unwrap();
 				let cmd = term.read_line().unwrap();
 
-				if cmd == "ls" {
+				let cmd = cmd::cmd(cmd).unwrap();
+
+				if cmd[0] == "ls" {
 					let mut client = client::Client::new(ip.clone() , port.clone()).await.unwrap();
-					let result = client.ls(String::from(cwd.clone())).await.expect("");
+					let result = client.ls(String::from(cwd.clone())).await.unwrap();
 
 					let mut files : Vec<FileInfo> = vec![];
 
 					for i in result {
 						let col : Vec<&str> = i.split("|").collect();
-						files.push(FileInfo{name : col[0].to_string() , typ : col[1].to_string() , size : col[2].to_string() , modified : col[3].to_string()});
+						files.push(FileInfo{name : col[0].to_string() , typ : col[1].to_string() , size : col[2].to_string() , modified : col[3].to_string() , accesstime : col[4].to_string()});
 					}
 
 					let table = Table::new(files).to_string();
