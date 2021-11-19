@@ -69,7 +69,7 @@ In yaftp version 1.0 , only support 9 methods.
 +------+-----------+
 | get  |   0x08    |
 +------+-----------+
-| type |   0x09    |
+| info |   0x09    |
 +------+-----------+
 ```
 

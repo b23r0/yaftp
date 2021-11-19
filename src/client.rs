@@ -260,7 +260,7 @@ impl Client {
 		let _ = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp send command error");
+				println!("server reply error");
 				return Err(e);
 			},
 		};
@@ -285,7 +285,7 @@ impl Client {
 			},
 		};
 
-		let size = u64::from_be_bytes(arg[0..4].try_into().unwrap());
+		let size = u64::from_be_bytes(arg[0..8].try_into().unwrap());
 		ret.push(size);
 
 		let arg = match self.read_argument(8).await{
@@ -296,7 +296,7 @@ impl Client {
 			},
 		};
 
-		let mt = u64::from_be_bytes(arg[0..4].try_into().unwrap());
+		let mt = u64::from_be_bytes(arg[0..8].try_into().unwrap());
 		ret.push(mt);
 
 		let arg = match self.read_argument(8).await{
@@ -307,7 +307,7 @@ impl Client {
 			},
 		};
 
-		let at = u64::from_be_bytes(arg[0..4].try_into().unwrap());
+		let at = u64::from_be_bytes(arg[0..8].try_into().unwrap());
 		ret.push(at);
 
 		Ok(ret)

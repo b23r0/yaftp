@@ -14,7 +14,7 @@ use console::Term;
 use console::style;
 use tabled::{Tabled, Table};
 
-use crate::{cmd::CmdError, common::error_retcode};
+use crate::{common::error_retcode};
 
 #[derive(Tabled)]
 struct FileInfo {
@@ -89,7 +89,7 @@ async fn main() -> io::Result<()>  {
 			};
 
 			let mut client = client::Client::new(ip.clone() , port.clone()).await?;
-			let cwd = match client.cwd().await{
+			let mut cwd = match client.cwd().await{
 				Ok(p) => p,
 				Err(e) => {
 					log::error!("error code : {}" , error_retcode(e));
@@ -103,11 +103,33 @@ async fn main() -> io::Result<()>  {
 				term.write_all(wt.as_bytes()).unwrap();
 				let cmd = term.read_line().unwrap();
 
-				let cmd = cmd::cmd(cmd).unwrap();
+				let cmd = match cmd::cmd(cmd){
+					Ok(p) => p,
+					Err(_) => {
+						println!("command parser faild");
+						continue;
+					},
+				};
+
+				if cmd.len() == 0{
+					continue;
+				}
 
 				if cmd[0] == "ls" {
-					let mut client = client::Client::new(ip.clone() , port.clone()).await.unwrap();
-					let result = client.ls(String::from(cwd.clone())).await.unwrap();
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+					let result = match client.ls(String::from(cwd.clone())).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("command execute faild");
+							continue;
+						},
+					};
 
 					let mut files : Vec<FileInfo> = vec![];
 
@@ -118,6 +140,98 @@ async fn main() -> io::Result<()>  {
 
 					let table = Table::new(files).to_string();
 					print!("{}",table);
+				}
+				
+				if cmd[0] == "cd" {
+					if cmd.len() != 2{
+						println!("command 'cd' need two argument . eg : cd /var");
+						continue;
+					}
+
+					if cmd[1] == "." {
+						continue;
+					}
+
+					let mut cdpath : String;
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let is_windows = cwd.as_bytes()[0] != '/' as u8;
+
+					if cmd[1] == ".."{
+
+						if is_windows {
+
+							let pos = cwd.rfind('\\').unwrap();
+
+							if pos == 2 && cwd.len() == 3{
+								continue;	
+							}
+
+							cdpath = cwd.split_at(pos).0.to_string();
+
+						} else {
+							let pos = cwd.rfind('/').unwrap();
+
+							cdpath = cwd.split_at(pos).0.to_string();
+
+							if cdpath.len() == 0 {
+								cdpath = "/".to_string();
+							}
+						}
+						
+					} else {
+
+						loop {
+
+							if is_windows {
+								if cmd[1].len() > 1 {
+									if cmd[1].as_bytes()[1] == ':' as u8 {
+										cdpath = cmd[1].clone();
+										break;
+									} 
+								}
+
+								if cwd.len() == 3 {
+									cdpath = cwd.clone() + &cmd[1].clone();
+								} else {
+									cdpath = [cwd.clone() , cmd[1].clone()].join("\\");
+								}
+							} else {
+								if cmd[1].as_bytes()[0] == '/' as u8{
+									cdpath = cmd[1].clone();
+									break;
+								}
+								if cwd == "/" {
+									cdpath = cwd.clone() + &cmd[1].clone();
+								} else {
+									cdpath = [cwd.clone() , cmd[1].clone()].join("/");
+								}
+							}
+							break;
+						}
+					}
+					
+					let ret = match client.info(cdpath.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("check folder status faild");
+							continue;
+						},
+					};
+
+					if ret[0] == 0 {
+						cwd = cdpath;
+					} else {
+						println!("'{}' not a path" , cdpath);
+					}
+
 				}
 			}
 

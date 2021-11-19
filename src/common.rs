@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug};
 
 pub enum YaftpError {
     OK,
@@ -55,6 +55,7 @@ pub fn retcode_error(retcode : u8) -> YaftpError {
 
 pub fn error_retcode(code : YaftpError) -> u8 {
     match code {
+        YaftpError::OK => 0x00,
         YaftpError::NoSupportVersion => 0x01,
         YaftpError::NoSupportCommand => 0x02,
         YaftpError::NoPermission => 0x03,

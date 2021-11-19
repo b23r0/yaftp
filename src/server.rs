@@ -324,7 +324,7 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 			},
 		};
 
-		let mut t : u8 = 0xff;
+		let t : u8;
 
 		if info.is_dir() {
 			t = 0;
@@ -493,6 +493,9 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			},
 			0x02 => {
 				let _ = c_cwd(&mut stream , narg ).await;
+			},
+			0x09 => {
+				let _ = c_info(&mut stream , narg ).await;
 			},
 			_ => {
 				log::error!("not support command {}" , command[0]);
