@@ -285,14 +285,16 @@ command `get` if retcode eq 0 will return request file data md5 hash , then serv
 ### info - 0x09
 
 ```
-+---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Command | NArg      | Arg1                  | Arg2                  | Arg3                  | Arg3                  |
-+---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
-| info    | 0 or 3    | u8                    | u64                   | u64                   | u64                   |
-+---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Command | NArg      | Arg1                  | Arg2                  | Arg3                  | Arg4                  | Arg5                  |
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| info    | 0 or 3    | u8                    | u64                   | u64                   | u64                   | path(string)          |
++---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 ```
 
-command `info` if retcode eq 0 will return arg1 (filetype : 0 is folder , 1 is file , other is others) , arg2(filesize) , arg3 (file last modify timestamp) , arg3 (file last accessed timestamp).
+command `info` if retcode eq 0 will return arg1 (filetype : 0 is folder , 1 is file , other is others) , arg2(filesize) , arg3 (file last modify timestamp) , arg4 (file last accessed timestamp) , arg5 (absolute path).
+
+command `info` if retcode eq 0 will return absolute path.
 
 ## Finally
 

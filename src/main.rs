@@ -1,5 +1,5 @@
 
-use std::{ io::Write};
+use std::{io::Write};
 
 use futures::{StreamExt};
 use async_std::{io, net::{TcpListener}, task};
@@ -26,7 +26,76 @@ struct FileInfo {
 }
 
 fn usage() {
+	println!("yaftp - Yet Another File Transfer Protocol");
+	println!("https://github.com/b23r0/yaftp");
+	println!("Usage: yaftp [-l yaftp port] [-c ip port]");
+}
 
+fn pre_handle_path (path : String , cwd : String) -> String{
+
+	let mut cdpath : String;
+
+	let is_windows = cwd.as_bytes()[0] != '/' as u8;
+
+	if path == ".."{
+
+		if is_windows {
+
+			let pos = cwd.rfind('\\').unwrap();
+
+			if pos == 2 && cwd.len() == 3{
+				return "".to_string();	
+			}
+
+			cdpath = cwd.split_at(pos).0.to_string();
+
+			if cdpath.len() == 2 {
+				cdpath += &"\\".to_string();
+			}
+
+		} else {
+			let pos = cwd.rfind('/').unwrap();
+
+			cdpath = cwd.split_at(pos).0.to_string();
+
+			if cdpath.len() == 0 {
+				cdpath = "/".to_string();
+			}
+		}
+		
+	} else {
+
+		loop {
+
+			if is_windows {
+				if path.len() > 1 {
+					if path.as_bytes()[1] == ':' as u8 {
+						cdpath = path;
+						break;
+					} 
+				}
+
+				if cwd.len() == 3 {
+					cdpath = cwd + &path;
+				} else {
+					cdpath = [cwd , path].join("\\");
+				}
+			} else {
+				if path.as_bytes()[0] == '/' as u8{
+					cdpath = path;
+					break;
+				}
+				if cwd == "/" {
+					cdpath = cwd + &path;
+				} else {
+					cdpath = [cwd , path].join("/");
+				}
+			}
+			break;
+		}
+	}
+
+	cdpath
 }
 
 #[async_std::main]
@@ -101,7 +170,9 @@ async fn main() -> io::Result<()>  {
 				term.set_title("yaftp");
 				let wt = format!("yaftp @ {} > ", style(cwd.clone()).red());
 				term.write_all(wt.as_bytes()).unwrap();
-				let cmd = term.read_line().unwrap();
+				let mut cmd = String::new();
+				std::io::stdin().read_line(&mut cmd)?;
+				let cmd = cmd.trim().to_string();
 
 				let cmd = match cmd::cmd(cmd){
 					Ok(p) => p,
@@ -152,7 +223,11 @@ async fn main() -> io::Result<()>  {
 						continue;
 					}
 
-					let mut cdpath : String;
+					let cdpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if cdpath.len() == 0{
+						continue;
+					}
 
 					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
 						Ok(p) => p,
@@ -162,74 +237,17 @@ async fn main() -> io::Result<()>  {
 						},
 					};
 
-					let is_windows = cwd.as_bytes()[0] != '/' as u8;
-
-					if cmd[1] == ".."{
-
-						if is_windows {
-
-							let pos = cwd.rfind('\\').unwrap();
-
-							if pos == 2 && cwd.len() == 3{
-								continue;	
-							}
-
-							cdpath = cwd.split_at(pos).0.to_string();
-
-						} else {
-							let pos = cwd.rfind('/').unwrap();
-
-							cdpath = cwd.split_at(pos).0.to_string();
-
-							if cdpath.len() == 0 {
-								cdpath = "/".to_string();
-							}
-						}
-						
-					} else {
-
-						loop {
-
-							if is_windows {
-								if cmd[1].len() > 1 {
-									if cmd[1].as_bytes()[1] == ':' as u8 {
-										cdpath = cmd[1].clone();
-										break;
-									} 
-								}
-
-								if cwd.len() == 3 {
-									cdpath = cwd.clone() + &cmd[1].clone();
-								} else {
-									cdpath = [cwd.clone() , cmd[1].clone()].join("\\");
-								}
-							} else {
-								if cmd[1].as_bytes()[0] == '/' as u8{
-									cdpath = cmd[1].clone();
-									break;
-								}
-								if cwd == "/" {
-									cdpath = cwd.clone() + &cmd[1].clone();
-								} else {
-									cdpath = [cwd.clone() , cmd[1].clone()].join("/");
-								}
-							}
-							break;
-						}
-					}
-					
-					let ret = match client.info(cdpath.clone()).await{
+					let (ret, path) = match client.info(cdpath.clone()).await{
 						Ok(p) => p,
 						Err(_) => {
-							println!("check folder status faild");
 							continue;
 						},
 					};
 
 					if ret[0] == 0 {
-						cwd = cdpath;
+						cwd = path;
 					} else {
-						println!("'{}' not a path" , cdpath);
+						println!("'{}' not a path" , path);
 					}
 
 				}

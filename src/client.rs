@@ -201,7 +201,7 @@ impl Client {
 		let narg = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp send replay error");
+				println!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -231,7 +231,7 @@ impl Client {
 		Ok(ret)
 	}
 
-	pub async fn info(self : &mut Client , path : String) -> Result<Vec<u64> ,YaftpError> {
+	pub async fn info(self : &mut Client , path : String) -> Result<(Vec<u64> , String),YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -260,7 +260,7 @@ impl Client {
 		let _ = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server reply error");
+				println!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -310,7 +310,23 @@ impl Client {
 		let at = u64::from_be_bytes(arg[0..8].try_into().unwrap());
 		ret.push(at);
 
-		Ok(ret)
+		let arg = match self.read_argument(2048).await{
+			Ok(p) => p,
+			Err(e) => {
+				println!("yaftp read argument error");
+				return Err(e);
+			},
+		};
+
+		let path = match String::from_utf8(arg) {
+			Ok(p) => p,
+			Err(_) => {
+				println!("format argument to utf8 string faild");
+				return Err(YaftpError::ArgumentUnvalid);
+			}
+		};
+		
+		Ok((ret , path))
 	}
 
 	pub async fn cwd(self : &mut Client) -> Result<String,YaftpError> {
@@ -334,7 +350,7 @@ impl Client {
 		match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read reply error");
+				println!("server error code : {}" , e);
 				return Err(e);
 			},
 		};

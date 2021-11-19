@@ -1,4 +1,4 @@
-use std::fmt::{Debug};
+use std::{error, fmt::{self, Debug}};
 
 pub enum YaftpError {
     OK,
@@ -14,6 +14,32 @@ pub enum YaftpError {
     ReadCwdFaild,
     UnknownNetwordError,
     UnknownError
+}
+
+impl fmt::Display for YaftpError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OK => write!(f, "OK"),
+            Self::NoSupportVersion => write!(f, "NO_SUPPORT_VERSION"),
+            Self::NoSupportCommand => write!(f, "NO_SUPPORT_COMMAND"),
+            Self::NoPermission => write!(f, "NO_PERMISSION"),
+            Self::NotFound => write!(f, "NOT_FOUND"),
+            Self::StartPosUnvalid => write!(f, "START_POS_UNVALID"),
+            Self::EndPosUnvalid => write!(f, "END_POS_UNVALID"),
+            Self::CheckHashFaild => write!(f, "CHECK_HASH_FAILD"),
+            Self::ArgumentUnvalid => write!(f, "ARGUMENT_UNVALID"),
+            Self::ReadFolderFaild => write!(f, "READ_FOLDER_FAILD"),
+            Self::ReadCwdFaild => write!(f, "READ_CWD_FAILD"),
+            Self::UnknownNetwordError => write!(f, "UNKNOWN_NETWORD_ERROR"),
+            Self::UnknownError => write!(f, "UNKNOWN_ERROR"),
+        }
+    }
+}
+
+impl error::Error for YaftpError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
+    }
 }
 
 impl Debug for YaftpError {

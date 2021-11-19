@@ -1,12 +1,13 @@
 include!{"utils.rs"}
 
 use crate::common::{YaftpError, error_retcode};
-use std::{fs, net::Shutdown};
+use std::{fs, net::Shutdown, path::{Path}};
 
 use futures::{AsyncReadExt, AsyncWriteExt};
 use async_std::{net::{TcpStream}};
 use chrono::DateTime;
 use chrono::offset::Utc;
+use path_absolutize::*;
 
 async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, YaftpError> {
 	/*
@@ -312,13 +313,32 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 			},
 		};
 
-		let info = match fs::metadata(path){
+		let path = Path::new(path.as_str());
+		let path =  match path.absolutize(){
 			Ok(p) => p,
 			Err(e) => {
 				if e.kind() == std::io::ErrorKind::PermissionDenied {
 					ret = error_retcode(YaftpError::NoPermission);
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		let path = path.to_str().unwrap().to_string();
+
+		let info = match fs::metadata(path.clone()){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
 			},
@@ -346,7 +366,7 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 
 		if ret == error_retcode(YaftpError::OK) {
 
-			match send_reply(stream, 0 , 4).await {
+			match send_reply(stream, 0 , 5).await {
 				Ok(_) => {},
 				Err(e) => {
 					ret = error_retcode(e);
@@ -388,6 +408,15 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 			let mut at = at.to_be_bytes().to_vec();
 
 			match send_argument(stream, &mut at).await {
+				Ok(_) => {},
+				Err(e) => {
+					log::error!("yaftp send argument error");
+					ret = error_retcode(e);
+					break;
+				},
+			};
+
+			match send_argument(stream, &mut path.as_bytes().to_vec()).await {
 				Ok(_) => {},
 				Err(e) => {
 					log::error!("yaftp send argument error");
