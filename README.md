@@ -47,7 +47,7 @@ Yet Another File Transfer Protocol.
 
 fisrt , client will send client version and support methods . 
 
-In yaftp version 1.0 , only support 9 methods.
+In yaftp version 1.0 , only support 10 methods.
 
 ```
 +------+-----------+
@@ -70,6 +70,8 @@ In yaftp version 1.0 , only support 9 methods.
 | get  |   0x08    |
 +------+-----------+
 | info |   0x09    |
++------+-----------+
+| hash |   0x0a    |
 +------+-----------+
 ```
 
@@ -112,19 +114,20 @@ next , we need know every command argument and type.
 ## Command Arguments
 
 ```
-+---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Command | NArg | Arg1                            | Arg2                  | Arg3                  | Arg4                  | Arg5                  |
-+---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| ls      | 1    | path [string](max 1024)         |                       |                       |                       |                       |
-| cwd     | 0    |                                 |                       |                       |                       |                       |
-| cp      | 2    | source path [string]            | target path [string]  |                       |                       |                       |
-| mkd     | 1    | path [string]                   |                       |                       |                       |                       |
-| mv      | 2    | source path [string]            | target path [string]  |                       |                       |                       |
-| rm      | 1    | path [string]                   |                       |                       |                       |                       |
-| put     | 4    | path [string]                   | md5[u32]              | start_pos[u64]        | end_pos[u64]          | data[stream]          |
-| get     | 4    | path [string]                   | start_pos[u64]        | end_pos[u64]          |                       |                       |
-| info    | 1    | path [string](max 1024)         |                       |                       |                       |                       |
-+---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
++---------+------+---------------------------------+-----------------------+-----------------------+
+| Command | NArg | Arg1                            | Arg2                  | Arg3                  |
++---------+------+---------------------------------+-----------------------+-----------------------+
+| ls      | 1    | path [string](max 1024)         |                       |                       |
+| cwd     | 0    |                                 |                       |                       |
+| cp      | 2    | source path [string]            | target path [string]  |                       |
+| mkd     | 1    | path [string]                   |                       |                       |
+| mv      | 2    | source path [string]            | target path [string]  |                       |
+| rm      | 1    | path [string]                   |                       |                       |
+| put     | 4    | path [string]                   | start_pos[u64]        | data[stream]          |
+| get     | 4    | path [string]                   | start_pos[u64]        |                       |
+| info    | 1    | path [string](max 1024)         |                       |                       |
+| hash    | 1    | path [string](max 1024)         | end_pos[u64]          |                       |
++---------+------+---------------------------------+-----------------------+-----------------------+
 ```
 
 Note : all path max size < 1024 bytes. you need check it.
@@ -262,26 +265,26 @@ command `rm` just return a code tell client if success.
 ### put - 0x07
 
 ```
-+---------+-----------+-----------------------+
-| Command | NArg      | Arg1                  |
-+---------+-----------+-----------------------+
-| put     | 0 or 1    | md5(u32)              |
-+---------+-----------+-----------------------+
++---------+-----------+
+| Command | NArg      |
++---------+-----------+
+| put     | 0         |
++---------+-----------+
 ```
 
-command `put` if retcode eq 0 will return a md5 hash after transfer finished.
+command `put` just return a code tell client if success.
 
 ### get - 0x08
 
 ```
-+---------+-----------+-----------------------+-----------------------+
-| Command | NArg      | Arg1                  | Arg2                  |
-+---------+-----------+-----------------------+-----------------------+
-| get     | 0 or 2    | md5(u32)              | data[stream]          |
-+---------+-----------+-----------------------+-----------------------+
++---------+-----------+-----------------------+
+| Command | NArg      | Arg1                  |
++---------+-----------+-----------------------+
+| get     | 0 or 1    | data(stream)          |
++---------+-----------+-----------------------+
 ```
 
-command `get` if retcode eq 0 will return request file data md5 hash , then server will send client request data.
+command `get` if retcode eq 0 will send client request data.
 
 ### info - 0x09
 
@@ -289,13 +292,23 @@ command `get` if retcode eq 0 will return request file data md5 hash , then serv
 +---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 | Command | NArg      | Arg1                  | Arg2                  | Arg3                  | Arg4                  | Arg5                  |
 +---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| info    | 0 or 3    | u8                    | u64                   | u64                   | u64                   | path(string)          |
+| info    | 0 or 5    | u8                    | u64                   | u64                   | u64                   | path(string)          |
 +---------+-----------+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 ```
 
 command `info` if retcode eq 0 will return arg1 (filetype : 0 is folder , 1 is file , other is others) , arg2(filesize) , arg3 (file last modify timestamp) , arg4 (file last accessed timestamp) , arg5 (absolute path).
 
-command `info` if retcode eq 0 will return absolute path.
+### hash - 0x0a
+
+```
++---------+-----------+-----------------------+
+| Command | NArg      | Arg1                  |
++---------+-----------+-----------------------+
+| hash    | 0 or 1    | md5_32(string)          |
++---------+-----------+-----------------------+
+```
+
+command `hash` if retcode eq 0 will return request file data md5 hash.
 
 ## Finally
 

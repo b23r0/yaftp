@@ -537,4 +537,65 @@ impl Client {
 			},
 		}
 	}
+
+	pub async fn hash(self : &mut Client , path : String , end_pos : u64) -> Result<String,YaftpError> {
+
+		match self.handshake().await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp handshake error");
+				return Err(e);
+			},
+		};
+
+		match self.send_command(10u8, 2).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send command error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut path.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut end_pos.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.read_reply().await{
+			Ok(p) => p,
+			Err(e) => {
+				println!("server error code : {}" , e);
+				return Err(e);
+			},
+		};
+
+		let arg = match self.read_argument(32).await{
+			Ok(p) => p,
+			Err(e) => {
+				println!("yaftp read argument error");
+				return Err(e);
+			},
+		};
+		
+		let ret = match String::from_utf8(arg) {
+			Ok(p) => p,
+			Err(_) => {
+				println!("format argument to utf8 string faild");
+				return Err(YaftpError::ArgumentUnvalid);
+			}
+		};
+	
+		Ok(ret)
+	}
 }

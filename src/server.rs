@@ -1,13 +1,14 @@
 include!{"utils.rs"}
 
 use crate::common::{YaftpError, error_retcode};
-use std::{fs, net::Shutdown, path::{Path}};
+use std::{fs, io::Read, net::Shutdown, path::{Path}};
 
 use futures::{AsyncReadExt, AsyncWriteExt};
 use async_std::{net::{TcpStream}};
 use chrono::DateTime;
 use chrono::offset::Utc;
 use path_absolutize::*;
+use md5::{Digest, Md5};
 
 async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, YaftpError> {
 	/*
@@ -899,6 +900,140 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 
 }
 
+async fn c_hash(stream :&mut  TcpStream, narg : u32){
+
+	let mut ret = 0u8;
+
+	if narg != 2 {
+		log::error!("command [{}] arguments count unvalid : {}" , "hash", narg);
+		ret = error_retcode(YaftpError::ArgumentCountError);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
+		return;
+	}
+	loop {
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let end_pos = match read_argument(stream, 8).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let end_pos = u64::from_be_bytes(end_pos.try_into().unwrap());
+
+		let path = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+		let path = Path::new(path.as_str());
+		let path =  match path.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		let mut f = match fs::File::open(&path){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		let mut md5 = Md5::default();
+
+		let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
+		
+		let mut sum : u64 = 0;
+		loop{
+
+			let n = match f.read(&mut buffer) {
+				Ok(n) => n,
+				Err(_) => {
+					ret = error_retcode(YaftpError::UnknownError);
+					break;
+				},
+			};
+			sum += n as u64;
+			md5.update(&buffer[..n]);
+			if n == 0 {
+				break;
+			}
+			if sum == end_pos {
+				break;
+			}
+		}
+
+		let mut md5_str = String::new();
+
+		for b in md5.finalize(){
+			let a = format!("{:02x}", b);
+			md5_str += &a;
+		}
+
+		if ret == error_retcode(YaftpError::OK){
+			match send_reply(stream, 0 , 1).await {
+				Ok(_) => {},
+				Err(_) => {
+				},
+			};
+		}
+
+		match send_argument(stream, &mut md5_str.as_bytes().to_vec()).await {
+			Ok(_) => {},
+			Err(e) => {
+				log::error!("yaftp send argument error");
+				ret = error_retcode(e);
+				break;
+			},
+		};
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+
+}
+
 pub async fn yaftp_server_handle(mut stream : TcpStream){
 
 	loop {
@@ -944,7 +1079,7 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 		| 1(u8) |   1(u8)  | 1 to 255 (u8) |
 		+-------+----------+---------------+
 		*/
-		match stream.write_all(&[1u8, 9u8 , 1u8 , 2u8 , 3u8 , 4u8 , 5u8 , 6u8 , 7u8, 8u8, 9u8]).await{
+		match stream.write_all(&[1u8, 10u8 , 1u8 , 2u8 , 3u8 , 4u8 , 5u8 , 6u8 , 7u8, 8u8, 9u8 , 10u8]).await{
 			Ok(_) => {},
 			Err(e) => {
 				log::error!("error : {}" , e);
@@ -996,6 +1131,9 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			},
 			0x09 => {
 				let _ = c_info(&mut stream , narg ).await;
+			},
+			0x0a => {
+				let _ = c_hash(&mut stream , narg ).await;
 			},
 			_ => {
 				log::error!("not support command {}" , command[0]);
