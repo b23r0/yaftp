@@ -314,6 +314,37 @@ async fn main() -> io::Result<()>  {
 					};
 
 				}
+
+				if cmd[0] == "mkdir" {
+					if cmd.len() != 2{
+						println!("command 'mkdir' need 1 argument . eg : mkdir /var/folder1/folder2");
+						continue;
+					}
+
+					let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if path.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let _ = match client.mkd(path.clone()).await{
+						Ok(_) => {
+							println!("mkdir '{}' success" , path);
+						},
+						Err(_) => {
+							continue;
+						},
+					};
+
+				}
 			}
 
 		},
