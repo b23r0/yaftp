@@ -345,6 +345,63 @@ async fn main() -> io::Result<()>  {
 					};
 
 				}
+
+				if cmd[0] == "mv" {
+					if cmd.len() != 3{
+						println!("command 'mv' need 2 argument . eg : mv /var/file1 /var/file2");
+						continue;
+					}
+
+					let srcpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if srcpath.len() == 0{
+						continue;
+					}
+
+					let targetpath = pre_handle_path(cmd[2].clone(), cwd.clone());
+
+					if targetpath.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let (ret, _) = match client.info(srcpath.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							continue;
+						},
+					};
+					
+					if ret[0] != 1 {
+						println!("'{}' not a file" , srcpath);
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let _ = match client.mv(srcpath.clone() , targetpath.clone()).await{
+						Ok(_) => {
+							println!("move file '{}' to '{}' success" , srcpath , targetpath);
+						},
+						Err(_) => {
+							continue;
+						},
+					};
+
+				}
 			}
 
 		},

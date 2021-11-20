@@ -645,6 +645,138 @@ async fn c_mkd(stream :&mut  TcpStream, narg : u32){
 
 }
 
+async fn c_mv(stream :&mut  TcpStream, narg : u32){
+
+	let mut ret = 0u8;
+
+	if narg != 2 {
+		log::error!("command [{}] arguments count unvalid : {}" , "mv", narg);
+		ret = error_retcode(YaftpError::ArgumentCountError);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
+		return;
+	}
+	loop {
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let srcpath = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+
+		let srcpath = Path::new(srcpath.as_str());
+		let srcpath =  match srcpath.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let targetpath = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+		let targetpath = Path::new(targetpath.as_str());
+		let targetpath =  match targetpath.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		match fs::copy(srcpath.clone(), targetpath){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		match fs::remove_file(srcpath){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		if ret == error_retcode(YaftpError::OK){
+			match send_reply(stream, 0 , 0).await {
+				Ok(_) => {},
+				Err(_) => {
+				},
+			};
+		}
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+
+}
+
 pub async fn yaftp_server_handle(mut stream : TcpStream){
 
 	loop {
@@ -733,6 +865,9 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			},
 			0x04 => {
 				let _ = c_mkd(&mut stream , narg ).await;
+			},
+			0x05 => {
+				let _ = c_mv(&mut stream , narg ).await;
 			}
 			0x09 => {
 				let _ = c_info(&mut stream , narg ).await;
