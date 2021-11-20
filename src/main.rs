@@ -187,6 +187,12 @@ async fn main() -> io::Result<()>  {
 				}
 
 				if cmd[0] == "ls" {
+
+					if cmd.len() != 1{
+						println!("command 'ls' not any argument . eg : ls");
+						continue;
+					}
+
 					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
 						Ok(p) => p,
 						Err(_) => {
@@ -215,7 +221,7 @@ async fn main() -> io::Result<()>  {
 				
 				if cmd[0] == "cd" {
 					if cmd.len() != 2{
-						println!("command 'cd' need two argument . eg : cd /var");
+						println!("command 'cd' need 1 argument . eg : cd /var");
 						continue;
 					}
 
@@ -249,6 +255,63 @@ async fn main() -> io::Result<()>  {
 					} else {
 						println!("'{}' not a path" , path);
 					}
+
+				}
+
+				if cmd[0] == "cp" {
+					if cmd.len() != 3{
+						println!("command 'cp' need 2 argument . eg : cp /var/file1 /var/file2");
+						continue;
+					}
+
+					let srcpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if srcpath.len() == 0{
+						continue;
+					}
+
+					let targetpath = pre_handle_path(cmd[2].clone(), cwd.clone());
+
+					if targetpath.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let (ret, _) = match client.info(srcpath.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							continue;
+						},
+					};
+					
+					if ret[0] != 1 {
+						println!("'{}' not a file" , srcpath);
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let _ = match client.cp(srcpath.clone() , targetpath.clone()).await{
+						Ok(_) => {
+							println!("copy file '{}' to '{}' success" , srcpath , targetpath);
+						},
+						Err(_) => {
+							continue;
+						},
+					};
 
 				}
 			}

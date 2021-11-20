@@ -10,6 +10,7 @@ pub enum YaftpError {
     EndPosUnvalid,
     CheckHashFaild,
     ArgumentUnvalid,
+    ArgumentCountError,
     ReadFolderFaild,
     ReadCwdFaild,
     UnknownNetwordError,
@@ -28,6 +29,7 @@ impl fmt::Display for YaftpError {
             Self::EndPosUnvalid => write!(f, "END_POS_UNVALID"),
             Self::CheckHashFaild => write!(f, "CHECK_HASH_FAILD"),
             Self::ArgumentUnvalid => write!(f, "ARGUMENT_UNVALID"),
+            Self::ArgumentCountError => write!(f, "ARGUMENT_COUNT_ERROR"),
             Self::ReadFolderFaild => write!(f, "READ_FOLDER_FAILD"),
             Self::ReadCwdFaild => write!(f, "READ_CWD_FAILD"),
             Self::UnknownNetwordError => write!(f, "UNKNOWN_NETWORD_ERROR"),
@@ -54,6 +56,7 @@ impl Debug for YaftpError {
             Self::EndPosUnvalid => write!(f, "END_POS_UNVALID"),
             Self::CheckHashFaild => write!(f, "CHECK_HASH_FAILD"),
             Self::ArgumentUnvalid => write!(f, "ARGUMENT_UNVALID"),
+            Self::ArgumentCountError => write!(f, "ARGUMENT_COUNT_ERROR"),
             Self::ReadFolderFaild => write!(f, "READ_FOLDER_FAILD"),
             Self::ReadCwdFaild => write!(f, "READ_CWD_FAILD"),
             Self::UnknownNetwordError => write!(f, "UNKNOWN_NETWORD_ERROR"),
@@ -64,6 +67,7 @@ impl Debug for YaftpError {
 
 pub fn retcode_error(retcode : u8) -> YaftpError {
     match retcode {
+        0x00 => YaftpError::OK,
         0x01 => YaftpError::NoSupportVersion,
         0x02 => YaftpError::NoSupportCommand,
         0x03 => YaftpError::NoPermission,
@@ -72,9 +76,10 @@ pub fn retcode_error(retcode : u8) -> YaftpError {
         0x06 => YaftpError::EndPosUnvalid,
         0x07 => YaftpError::CheckHashFaild,
         0x08 => YaftpError::ArgumentUnvalid,
-        0x09 => YaftpError::ReadFolderFaild,
-        0x0a => YaftpError::ReadCwdFaild,
-        0x0b => YaftpError::UnknownNetwordError,
+        0x09 => YaftpError::ArgumentCountError,
+        0x0a => YaftpError::ReadFolderFaild,
+        0x0b => YaftpError::ReadCwdFaild,
+        0x0c => YaftpError::UnknownNetwordError,
         _ => YaftpError::UnknownError
     }
 }
@@ -90,9 +95,10 @@ pub fn error_retcode(code : YaftpError) -> u8 {
         YaftpError::EndPosUnvalid => 0x06,
         YaftpError::CheckHashFaild => 0x07,
         YaftpError::ArgumentUnvalid => 0x08,
-        YaftpError::ReadFolderFaild => 0x09,
-        YaftpError::ReadCwdFaild => 0x0a,
-        YaftpError::UnknownNetwordError => 0x0b,
+        YaftpError::ArgumentCountError => 0x09,
+        YaftpError::ReadFolderFaild => 0x0a,
+        YaftpError::ReadCwdFaild => 0x0b,
+        YaftpError::UnknownNetwordError => 0x0c,
         _ => 0xff
     }
 }

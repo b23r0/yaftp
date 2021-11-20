@@ -373,4 +373,49 @@ impl Client {
 	
 		Ok(ret)
 	}
+
+	pub async fn cp(self : &mut Client , srcpath : String , targetpath : String) -> Result<u32 , YaftpError> {
+
+		match self.handshake().await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp handshake error");
+				return Err(e);
+			},
+		};
+
+		match self.send_command(3u8, 2).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send command error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut srcpath.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut targetpath.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.read_reply().await{
+			Ok(p) => {
+				return Ok(p);
+			},
+			Err(e) => {
+				println!("server error code : {}" , e);
+				return Err(e);
+			},
+		}
+	}
 }

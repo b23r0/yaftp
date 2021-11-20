@@ -121,10 +121,9 @@ next , we need know every command argument and type.
 | mkd     | 1    | path [string]                   |                       |                       |                       |                       |
 | mv      | 2    | source path [string]            | target path [string]  |                       |                       |                       |
 | rm      | 1    | path [string]                   |                       |                       |                       |                       |
-| rm      | 1    | path [string]                   |                       |                       |                       |                       |
 | put     | 4    | path [string]                   | md5[u32]              | start_pos[u64]        | end_pos[u64]          | data[stream]          |
 | get     | 4    | path [string]                   | start_pos[u64]        | end_pos[u64]          |                       |                       |
-| type    | 1    | path [string](max 1024)         |                       |                       |                       |                       |
+| info    | 1    | path [string](max 1024)         |                       |                       |                       |                       |
 +---------+------+---------------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 ```
 
@@ -162,11 +161,13 @@ if check vaild return 0x00 , else return 1~255.
 +-----------+-----------------------------+
 |  7        |  check hash faild           |
 +-----------+-----------------------------+
-|  8        |  argument unvaild           |
+|  8        |  argument count error       |
 +-----------+-----------------------------+
-|  9        |  read folder faild          |
+|  9        |  argument unvaild           |
 +-----------+-----------------------------+
-|  10       |  read cwd faild             |
+|  10       |  read folder faild          |
++-----------+-----------------------------+
+|  11       |  read cwd faild             |
 +-----------+-----------------------------+
 ```
 
