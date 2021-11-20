@@ -400,6 +400,36 @@ async fn main() -> io::Result<()>  {
 							continue;
 						},
 					};
+				}
+				
+				if cmd[0] == "rm" {
+					if cmd.len() != 2{
+						println!("command 'rm' need 1 argument . eg : rm /var/folder1/file2");
+						continue;
+					}
+
+					let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if path.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let _ = match client.rm(path.clone()).await{
+						Ok(_) => {
+							println!("remove '{}' success" , path);
+						},
+						Err(_) => {
+							continue;
+						},
+					};
 
 				}
 			}

@@ -217,7 +217,7 @@ async fn c_cwd(stream :&mut  TcpStream, narg : u32) -> u8 {
 	let mut ret = error_retcode(YaftpError::OK);
 
 	if narg != 0 {
-		log::error!("command [{}] arguments count unvalid : {}" , "ls", narg);
+		log::error!("command [{}] arguments count unvalid : {}" , "cwd", narg);
 		ret = error_retcode(YaftpError::ArgumentCountError);
 		match send_reply(stream, ret , 0).await {
 			Ok(_) => {},
@@ -777,6 +777,128 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 
 }
 
+async fn c_rm(stream :&mut  TcpStream, narg : u32){
+
+	let mut ret = 0u8;
+
+	if narg != 1 {
+		log::error!("command [{}] arguments count unvalid : {}" , "rm", narg);
+		ret = error_retcode(YaftpError::ArgumentCountError);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
+		return;
+	}
+	loop {
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let path = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+
+		let path = Path::new(path.as_str());
+		let path =  match path.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		let info = match fs::metadata(path.clone()){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			},
+		};
+
+		if info.is_dir(){
+			match fs::remove_dir_all(path){
+				Ok(p) => p,
+				Err(e) => {
+					if e.kind() == std::io::ErrorKind::PermissionDenied {
+						ret = error_retcode(YaftpError::NoPermission);
+					} else if e.kind() == std::io::ErrorKind::NotFound {
+						ret = error_retcode(YaftpError::NotFound);
+					} else {
+						print!("error : {}" , e);
+						ret = error_retcode(YaftpError::UnknownError);
+					}
+					break;
+				},
+			};
+		} else if info.is_file(){
+			match fs::remove_file(path){
+				Ok(p) => p,
+				Err(e) => {
+					if e.kind() == std::io::ErrorKind::PermissionDenied {
+						ret = error_retcode(YaftpError::NoPermission);
+					} else if e.kind() == std::io::ErrorKind::NotFound {
+						ret = error_retcode(YaftpError::NotFound);
+					} else {
+						print!("error : {}" , e);
+						ret = error_retcode(YaftpError::UnknownError);
+					}
+					break;
+				},
+			};
+		} else{
+			ret = error_retcode(YaftpError::UnknownError);
+			break;
+		}
+
+
+
+		if ret == error_retcode(YaftpError::OK){
+			match send_reply(stream, 0 , 0).await {
+				Ok(_) => {},
+				Err(_) => {
+				},
+			};
+		}
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+
+}
+
 pub async fn yaftp_server_handle(mut stream : TcpStream){
 
 	loop {
@@ -822,7 +944,7 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 		| 1(u8) |   1(u8)  | 1 to 255 (u8) |
 		+-------+----------+---------------+
 		*/
-		match stream.write_all(&[1u8, 8u8 , 1u8 , 2u8 , 3u8 , 4u8 , 5u8 , 6u8 , 7u8, 8u8]).await{
+		match stream.write_all(&[1u8, 9u8 , 1u8 , 2u8 , 3u8 , 4u8 , 5u8 , 6u8 , 7u8, 8u8, 9u8]).await{
 			Ok(_) => {},
 			Err(e) => {
 				log::error!("error : {}" , e);
@@ -868,7 +990,10 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			},
 			0x05 => {
 				let _ = c_mv(&mut stream , narg ).await;
-			}
+			},
+			0x06 => {
+				let _ = c_rm(&mut stream , narg ).await;
+			},
 			0x09 => {
 				let _ = c_info(&mut stream , narg ).await;
 			},
