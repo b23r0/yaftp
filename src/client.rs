@@ -260,7 +260,7 @@ impl Client {
 		let _ = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				//println!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -536,6 +536,107 @@ impl Client {
 				return Err(e);
 			},
 		}
+	}
+
+	pub async fn put(self : &mut Client , localpath : String ,remotepath : String , start_pos : u64) -> Result<String,YaftpError> {
+
+		match self.handshake().await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp handshake error");
+				return Err(e);
+			},
+		};
+
+		match self.send_command(7u8, 3).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send command error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut remotepath.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut start_pos.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		let mut f = match fs::File::open(localpath.clone()).await{
+			Ok(f) => f,
+			Err(_) => {
+				println!("open local file faild : {}" , localpath);
+				return Err(YaftpError::UnknownError);
+			},
+		};
+
+		/*
+		+-----------------+---------------------+
+		| NEXT_ARG_SIZE   |       ARG           |
+		+-----------------+---------------------+
+		|     8(u64)      |    Variable         |
+		+-----------------+---------------------+
+		*/
+
+		let size = f.metadata().await.unwrap().len();
+
+		match self.conn.write_all(&size.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("file transfer faild : {}" ,e);
+				return Err(YaftpError::UnknownNetwordError);
+			}
+		};
+
+		let mut buf = [0;2048];
+		let mut sum = 0u64;
+		loop{
+			let a = match f.read(&mut buf).await{
+				Ok(p) => p,
+				Err(e) => {
+					println!("file transfer faild : {}" , e);
+					return Err(YaftpError::UnknownError);
+				},
+			};
+
+			match self.conn.write_all(&buf[..a]).await{
+				Ok(p) => p,
+				Err(e) => {
+					println!("file transfer faild : {}" , e);
+					return Err(YaftpError::UnknownError);
+				},
+			};
+
+			sum += a as u64;
+
+			if sum >= size {
+				break
+			}
+		}
+
+		f.close().await.unwrap();
+
+		let _ = match self.read_reply().await{
+			Ok(p) => p,
+			Err(e) => {
+				println!("server error code : {}" , e);
+				return Err(e);
+			},
+		};
+	
+		println!("file transfer success!");
+
+		Ok(remotepath)
 	}
 
 	pub async fn get(self : &mut Client , path : String , start_pos : u64) -> Result<String,YaftpError> {

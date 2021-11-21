@@ -531,6 +531,61 @@ async fn main() -> io::Result<()>  {
 					};
 
 				}
+
+				if cmd[0] == "put" {
+					if cmd.len() != 2{
+						println!("command 'put' need 1 argument . eg : put /localfile/file1");
+						continue;
+					}
+
+					let localpath = cmd[1].clone();
+
+					let filename : String;
+
+					if cmd[1].as_bytes()[0] == '/' as u8 {
+						filename = localpath.split_at(localpath.rfind('/').unwrap() + 1).1.to_string();
+					} else {
+						filename = localpath.split_at(localpath.rfind('\\').unwrap() + 1).1.to_string();
+					}
+
+					let remotepath = pre_handle_path(filename, cwd.clone());
+
+					if localpath.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.info(remotepath.clone()).await{
+						Ok(_) => {
+							println!("'{}' remote file already exists" ,localpath);
+							continue;
+						},
+						Err(_) => {},
+					};
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.put(localpath , remotepath , 0).await{
+						Ok(_) => {},
+						Err(_) => {
+							continue;
+						},
+					};
+
+				}
 			}
 		},
 		"-t" => {

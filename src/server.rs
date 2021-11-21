@@ -893,6 +893,150 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 
 }
 
+async fn c_put(stream :&mut  TcpStream, narg : u32){
+
+	let mut ret = 0u8;
+
+	if narg != 3 {
+		log::error!("command [{}] arguments count unvalid : {}" , "put", narg);
+		ret = error_retcode(YaftpError::ArgumentCountError);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
+		return;
+	}
+	loop {
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let start_pos = match read_argument(stream, 8).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let start_pos = u64::from_be_bytes(start_pos.try_into().unwrap());
+
+		let path = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+
+		let path = Path::new(path.as_str());
+		let path =  match path.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			}
+		};
+
+		let path = path.to_str().unwrap().to_string();
+
+		let mut f = match async_std::fs::File::create(path).await{
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			}
+		};
+
+		f.seek(SeekFrom::Start(start_pos));
+
+		/*
+		+-----------------+---------------------+
+		| NEXT_ARG_SIZE   |      ARG            |
+		+-----------------+---------------------+
+		|     8(u64)      |	     Variable       |
+		+-----------------+---------------------+
+		*/
+		let mut argument_size = [0u8;8];
+		match stream.read_exact(&mut argument_size).await{
+			Ok(_) => {},
+			Err(_) => {
+				ret = error_retcode(YaftpError::UnknownNetwordError);
+				break;
+			},
+		};
+
+		let size = u64::from_be_bytes(argument_size);
+
+		let mut buf = [0;2048];
+		let mut sum = 0u64;
+		loop{
+			let a = match stream.read(&mut buf).await{
+				Ok(p) => p,
+				Err(_) => {
+					ret = error_retcode(YaftpError::UnknownNetwordError);
+					break;
+				},
+			};
+
+			match f.write_all(&buf[..a]).await{
+				Ok(p) => p,
+				Err(_) => {
+					ret = error_retcode(YaftpError::UnknownNetwordError);
+					break;
+				},
+			};
+
+			sum += a as u64;
+
+			if sum >= size {
+				break
+			}
+		}
+
+		f.close().await.unwrap();
+
+		if ret == error_retcode(YaftpError::OK){
+			match send_reply(stream, 0 , 0).await {
+				Ok(_) => {},
+				Err(_) => {
+				},
+			};
+		}
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+
+}
 
 async fn c_get(stream :&mut  TcpStream, narg : u32){
 
@@ -1252,6 +1396,9 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			},
 			0x06 => {
 				let _ = c_rm(&mut stream , narg ).await;
+			},
+			0x07 => {
+				let _ = c_put(&mut stream , narg ).await;
 			},
 			0x08 => {
 				let _ = c_get(&mut stream , narg ).await;
