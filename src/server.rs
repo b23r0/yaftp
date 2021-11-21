@@ -1,10 +1,10 @@
 include!{"utils.rs"}
 
 use crate::common::{YaftpError, error_retcode};
-use std::{fs, io::Read, net::Shutdown, path::{Path}};
+use std::{fs, io::{Read, SeekFrom}, net::Shutdown, path::{Path}};
 
 use futures::{AsyncReadExt, AsyncWriteExt};
-use async_std::{net::{TcpStream}};
+use async_std::{io::{self, prelude::SeekExt}, net::{TcpStream}};
 use chrono::DateTime;
 use chrono::offset::Utc;
 use path_absolutize::*;
@@ -13,7 +13,7 @@ use md5::{Digest, Md5};
 async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, YaftpError> {
 	/*
 	+-----------+-----------+
-	|  RETCODE  |  NARG	    |
+	|  RETCODE  |  NARG     |
 	+-----------+-----------+
 	|  1(u8)    |  4(u32)   |
 	+-----------+-----------+
@@ -37,9 +37,9 @@ async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Resu
 async fn send_argument(stream :&mut  TcpStream , data :&mut Vec<u8>) -> Result<Vec<u8>, YaftpError>{
 	/*
 	+-----------------+---------------------+
-	| NEXT_ARG_SIZE   |	      ARG           |
+	| NEXT_ARG_SIZE   |       ARG           |
 	+-----------------+---------------------+
-	|     8(u64)      |	   Variable	        |
+	|     8(u64)      |    Variable         |
 	+-----------------+---------------------+
 	*/
 	let size = data.len() as u64;
@@ -263,13 +263,6 @@ async fn c_cwd(stream :&mut  TcpStream, narg : u32) -> u8 {
 	}
 
 	if ret != error_retcode(YaftpError::OK){
-		/*
-		+-----------+-----------+
-		|  RETCODE  |  NARG	    |
-		+-----------+-----------+
-		|  1(u8)    |  4(u32)   |
-		+-----------+-----------+
-		*/
 
 		match send_reply(stream, ret , 0).await {
 			Ok(_) => {},
@@ -900,6 +893,137 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 
 }
 
+
+async fn c_get(stream :&mut  TcpStream, narg : u32){
+
+	let mut ret = 0u8;
+
+	if narg != 2 {
+		log::error!("command [{}] arguments count unvalid : {}" , "get", narg);
+		ret = error_retcode(YaftpError::ArgumentCountError);
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {},
+		};
+		return;
+	}
+	loop {
+		let path = match read_argument(stream, 1024).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let start_pos = match read_argument(stream, 8).await{
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			}
+		};
+
+		let start_pos = u64::from_be_bytes(start_pos.try_into().unwrap());
+
+		let path = match String::from_utf8(path.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				break;
+			},
+		};
+
+
+		let path = Path::new(path.as_str());
+		let path =  match path.absolutize(){
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			}
+		};
+
+		let path = path.to_str().unwrap().to_string();
+
+		let mut f = match async_std::fs::File::open(path).await{
+			Ok(p) => p,
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			}
+		};
+
+		f.seek(SeekFrom::Start(start_pos));
+
+		match send_reply(stream, 0 , 1).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+
+		/*
+		+-----------------+---------------------+
+		| NEXT_ARG_SIZE   |       ARG           |
+		+-----------------+---------------------+
+		|     8(u64)      |    Variable         |
+		+-----------------+---------------------+
+		*/
+
+		let size = f.metadata().await.unwrap().len();
+
+		match stream.write_all(&size.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(_) => {
+				ret = error_retcode(YaftpError::UnknownNetwordError);
+				break;
+			}
+		};
+
+		match io::copy(&mut f , stream).await{
+			Ok(_) => {},
+			Err(e) => {
+				if e.kind() == std::io::ErrorKind::PermissionDenied {
+					ret = error_retcode(YaftpError::NoPermission);
+				} else if e.kind() == std::io::ErrorKind::NotFound {
+					ret = error_retcode(YaftpError::NotFound);
+				} else {
+					print!("error : {}" , e);
+					ret = error_retcode(YaftpError::UnknownError);
+				}
+				break;
+			}
+		};
+
+		break;
+	}
+
+	if ret != error_retcode(YaftpError::OK){
+
+		match send_reply(stream, ret , 0).await {
+			Ok(_) => {},
+			Err(_) => {
+			},
+		};
+	}
+
+
+}
+
 async fn c_hash(stream :&mut  TcpStream, narg : u32){
 
 	let mut ret = 0u8;
@@ -1129,6 +1253,9 @@ pub async fn yaftp_server_handle(mut stream : TcpStream){
 			0x06 => {
 				let _ = c_rm(&mut stream , narg ).await;
 			},
+			0x08 => {
+				let _ = c_get(&mut stream , narg ).await;
+			}
 			0x09 => {
 				let _ = c_info(&mut stream , narg ).await;
 			},

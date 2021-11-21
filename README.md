@@ -304,7 +304,7 @@ command `info` if retcode eq 0 will return arg1 (filetype : 0 is folder , 1 is f
 +---------+-----------+-----------------------+
 | Command | NArg      | Arg1                  |
 +---------+-----------+-----------------------+
-| hash    | 0 or 1    | md5_32(string)          |
+| hash    | 0 or 1    | md5_32(string)        |
 +---------+-----------+-----------------------+
 ```
 

@@ -482,6 +482,55 @@ async fn main() -> io::Result<()>  {
 					};
 
 				}
+
+				if cmd[0] == "get" {
+					if cmd.len() != 2{
+						println!("command 'get' need 1 argument . eg : get /var/folder1/file2");
+						continue;
+					}
+
+					let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+
+					if path.len() == 0{
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					let (info, abspath) = match client.info(path.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							continue;
+						},
+					};
+
+					if info[0] != 1 {
+						println!("'{}' not a file" , abspath);
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.get(path.clone() , 0).await{
+						Ok(_) => {},
+						Err(_) => {
+							continue;
+						},
+					};
+
+				}
 			}
 		},
 		"-t" => {

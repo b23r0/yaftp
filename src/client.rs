@@ -1,9 +1,9 @@
 include!("utils.rs");
 
-use std::io::Error;
+use std::{io::Error};
 use crate::common::{YaftpError, retcode_error};
 use futures::{AsyncReadExt, AsyncWriteExt};
-use async_std::{net::{TcpStream}};
+use async_std::{fs, net::{TcpStream}};
 
 pub struct Client {
 	conn : TcpStream
@@ -95,9 +95,9 @@ impl Client {
 	async fn read_reply(self : &mut Client) -> Result<u32, YaftpError> {
 		/*
 		+-----------+-----------+
-		|  RETCODE  |  NARG	    |
+		|  RETCODE  |  NARG     |
 		+-----------+-----------+
-		|  1(u8)	|  4(u32)   |
+		|  1(u8)    |  4(u32)   |
 		+-----------+-----------+
 		*/
 		let mut reply = [0u8;5];
@@ -118,9 +118,9 @@ impl Client {
 	async fn send_argument(self : &mut Client , data :&mut Vec<u8>) -> Result<Vec<u8>, YaftpError>{
 		/*
 		+-----------------+---------------------+
-		| NEXT_ARG_SIZE   |	     ARG            |
+		| NEXT_ARG_SIZE   |      ARG            |
 		+-----------------+---------------------+
-		|     8(u64)      |	   Variable	        |
+		|     8(u64)      |    Variable         |
 		+-----------------+---------------------+
 		*/
 		let size = data.len() as u64;
@@ -143,7 +143,7 @@ impl Client {
 		+-----------------+---------------------+
 		| NEXT_ARG_SIZE   |	     ARG            |
 		+-----------------+---------------------+
-		|     8(u64)      |	   Variable	        |
+		|     8(u64)      |	   Variable         |
 		+-----------------+---------------------+
 		*/
 		let mut argument_size = [0u8;8];
@@ -536,6 +536,115 @@ impl Client {
 				return Err(e);
 			},
 		}
+	}
+
+	pub async fn get(self : &mut Client , path : String , start_pos : u64) -> Result<String,YaftpError> {
+
+		match self.handshake().await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp handshake error");
+				return Err(e);
+			},
+		};
+
+		match self.send_command(8u8, 2).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send command error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut path.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut start_pos.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		let _ = match self.read_reply().await{
+			Ok(p) => p,
+			Err(e) => {
+				println!("server error code : {}" , e);
+				return Err(e);
+			},
+		};
+	
+		/*
+		+-----------------+---------------------+
+		| NEXT_ARG_SIZE   |       ARG           |
+		+-----------------+---------------------+
+		|     8(u64)      |    Variable         |
+		+-----------------+---------------------+
+		*/
+
+		let mut argument_size = [0u8;8];
+		match self.conn.read_exact(&mut argument_size).await{
+			Ok(_) => {},
+			Err(_) => {
+				println!("read file size faild!");
+				return Err(YaftpError::UnknownNetwordError);
+			},
+		};
+
+		let size = u64::from_be_bytes(argument_size);
+
+		let filename : String;
+
+		if path.as_bytes()[0] == '/' as u8 {
+			filename = path.split_at(path.rfind('/').unwrap() + 1).1.to_string();
+		} else {
+			filename = path.split_at(path.rfind('\\').unwrap() + 1).1.to_string();
+		}
+
+		let mut f = match fs::File::create(filename.clone()).await{
+			Ok(f) => f,
+			Err(_) => {
+				println!("create local file faild : {}" , filename);
+				return Err(YaftpError::UnknownError);
+			},
+		};
+
+		let mut buf = [0;2048];
+		let mut sum = 0u64;
+		loop{
+			let a = match self.conn.read(&mut buf).await{
+				Ok(p) => p,
+				Err(e) => {
+					println!("file transfer faild : {}" , e);
+					return Err(YaftpError::UnknownError);
+				},
+			};
+
+			match f.write_all(&buf[..a]).await{
+				Ok(p) => p,
+				Err(e) => {
+					println!("file transfer faild : {}" , e);
+					return Err(YaftpError::UnknownError);
+				},
+			};
+
+			sum += a as u64;
+
+			if sum >= size {
+				break
+			}
+		}
+
+		f.close().await.unwrap();
+		println!("file transfer success!");
+
+		Ok(filename)
 	}
 
 	pub async fn hash(self : &mut Client , path : String , end_pos : u64) -> Result<String,YaftpError> {
