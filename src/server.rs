@@ -79,7 +79,7 @@ async fn read_argument(stream :&mut  TcpStream , max_size : u64) -> Result<Vec<u
 
 	if size > max_size {
 		log::error!("argument size error : {}" , size);
-		return Err(YaftpError::ArgumentUnvalid);
+		return Err(YaftpError::ArgumentSizeError);
 	}
 
 	let mut arg = vec![0u8;size as usize].into_boxed_slice();
@@ -101,7 +101,7 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 
 	if narg != 1 {
 		log::error!("command [{}] arguments count unvalid : {}" , "ls", narg);
-		ret = error_retcode(YaftpError::ArgumentUnvalid);
+		ret = error_retcode(YaftpError::ArgumentCountError);
 
 		match send_reply(stream, ret , 0).await {
 			Ok(_) => {},
@@ -116,8 +116,8 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::UnknownNetwordError);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -125,7 +125,7 @@ async fn c_ls(stream :&mut  TcpStream, narg : u32) -> u8 {
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -238,7 +238,13 @@ async fn c_cwd(stream :&mut  TcpStream, narg : u32) -> u8 {
 			},
 		};
 
-		let path = paths.to_str().unwrap();
+		let path = match paths.to_str(){
+			Some(p) => p,
+			None => {
+				ret = error_retcode(YaftpError::ReadCwdFaild);
+				break;
+			},
+		};
 
 		if ret == error_retcode(YaftpError::OK) {
 
@@ -293,8 +299,8 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -302,7 +308,7 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -452,8 +458,8 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -461,7 +467,7 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 		let srcpath = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -485,8 +491,8 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -494,7 +500,7 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 		let targetpath = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -569,8 +575,8 @@ async fn c_mkd(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -578,7 +584,7 @@ async fn c_mkd(stream :&mut  TcpStream, narg : u32){
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::ArgumentError);
 				break;
 			},
 		};
@@ -655,8 +661,8 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -664,7 +670,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 		let srcpath = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -688,8 +694,8 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -697,7 +703,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 		let targetpath = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -787,8 +793,8 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -796,7 +802,7 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -909,16 +915,16 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
 
 		let start_pos = match read_argument(stream, 8).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -928,7 +934,7 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -967,7 +973,13 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 			}
 		};
 
-		f.seek(SeekFrom::Start(start_pos));
+		match f.seek(SeekFrom::Start(start_pos)).await{
+			Ok(_) => {},
+			Err(_) => {
+				ret = error_retcode(YaftpError::StartPosError);
+				break;
+			},
+		};
 
 		/*
 		+-----------------+---------------------+
@@ -1001,7 +1013,7 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 			match f.write_all(&buf[..a]).await{
 				Ok(p) => p,
 				Err(_) => {
-					ret = error_retcode(YaftpError::UnknownNetwordError);
+					ret = error_retcode(YaftpError::WriteFileError);
 					break;
 				},
 			};
@@ -1054,16 +1066,16 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
 
 		let start_pos = match read_argument(stream, 8).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -1073,7 +1085,7 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -1112,7 +1124,13 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 			}
 		};
 
-		f.seek(SeekFrom::Start(start_pos));
+		match f.seek(SeekFrom::Start(start_pos)).await{
+			Ok(_) => {},
+			Err(_) => {
+				ret = error_retcode(YaftpError::StartPosError);
+				break;
+			},
+		};
 
 		match send_reply(stream, 0 , 1).await {
 			Ok(_) => {},
@@ -1184,16 +1202,16 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 	loop {
 		let path = match read_argument(stream, 1024).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
 
 		let end_pos = match read_argument(stream, 8).await{
 			Ok(p) => p,
-			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+			Err(e) => {
+				ret = error_retcode(e);
 				break;
 			}
 		};
@@ -1203,7 +1221,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 		let path = match String::from_utf8(path.to_vec()){
 			Ok(p) => p,
 			Err(_) => {
-				ret = error_retcode(YaftpError::ArgumentUnvalid);
+				ret = error_retcode(YaftpError::UTF8FormatError);
 				break;
 			},
 		};
@@ -1239,6 +1257,11 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			},
 		};
 
+		if end_pos > f.metadata().unwrap().len(){
+			ret = error_retcode(YaftpError::EndPosError);
+			break;
+		}
+
 		let mut md5 = Md5::default();
 
 		let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
@@ -1249,7 +1272,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			let n = match f.read(&mut buffer) {
 				Ok(n) => n,
 				Err(_) => {
-					ret = error_retcode(YaftpError::UnknownError);
+					ret = error_retcode(YaftpError::ReadFileError);
 					break;
 				},
 			};

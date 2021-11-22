@@ -1,12 +1,21 @@
 include!("utils.rs");
 
-use std::{io::Error};
+use std::{io::Error, net::Shutdown};
 use crate::common::{YaftpError, retcode_error};
 use futures::{AsyncReadExt, AsyncWriteExt};
 use async_std::{fs, net::{TcpStream}};
 
 pub struct Client {
 	conn : TcpStream
+}
+
+impl Drop for Client{
+    fn drop(&mut self) {
+		match self.conn.shutdown(Shutdown::Both){
+			Ok(_) => {},
+			Err(_) => {},
+		};
+    }
 }
 
 impl Client {
@@ -65,7 +74,7 @@ impl Client {
 		};
 
 		if !check_support_methods(&methods){
-			println!("the client has not support method");
+			println_err!("the client has not support method");
 		}
 
 		Ok(methods.to_vec())
@@ -157,7 +166,7 @@ impl Client {
 		let size = u64::from_be_bytes(argument_size);
 
 		if size > max_size {
-			return Err(YaftpError::ArgumentUnvalid);
+			return Err(YaftpError::ArgumentError);
 		}
 
 		let mut arg = vec![0u8;size as usize].into_boxed_slice();
@@ -177,7 +186,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -185,7 +194,7 @@ impl Client {
 		match self.send_command(1u8, 1).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -193,7 +202,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -201,7 +210,7 @@ impl Client {
 		let narg = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -212,7 +221,7 @@ impl Client {
 			let arg = match self.read_argument(2048).await{
 				Ok(p) => p,
 				Err(e) => {
-					println!("yaftp read argument error");
+					println_err!("yaftp read argument error");
 					return Err(e);
 				},
 			};
@@ -220,8 +229,8 @@ impl Client {
 			let row = match String::from_utf8(arg){
 				Ok(p) => p,
 				Err(_) => {
-					println!("format argument to utf8 string faild");
-					return Err(YaftpError::ArgumentUnvalid);
+					println_err!("format argument to utf8 string faild");
+					return Err(YaftpError::ArgumentError);
 				},
 			}; 
 			ret.push(row);
@@ -236,7 +245,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -244,7 +253,7 @@ impl Client {
 		match self.send_command(9u8, 1).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -252,7 +261,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -270,7 +279,7 @@ impl Client {
 		let arg = match self.read_argument(1).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -280,7 +289,7 @@ impl Client {
 		let arg = match self.read_argument(8).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -291,7 +300,7 @@ impl Client {
 		let arg = match self.read_argument(8).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -302,7 +311,7 @@ impl Client {
 		let arg = match self.read_argument(8).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -313,7 +322,7 @@ impl Client {
 		let arg = match self.read_argument(2048).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -321,8 +330,8 @@ impl Client {
 		let path = match String::from_utf8(arg) {
 			Ok(p) => p,
 			Err(_) => {
-				println!("format argument to utf8 string faild");
-				return Err(YaftpError::ArgumentUnvalid);
+				println_err!("format argument to utf8 string faild");
+				return Err(YaftpError::ArgumentError);
 			}
 		};
 		
@@ -334,7 +343,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -342,7 +351,7 @@ impl Client {
 		match self.send_command(2u8, 0).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -350,7 +359,7 @@ impl Client {
 		match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -358,7 +367,7 @@ impl Client {
 		let arg = match self.read_argument(2048).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -366,8 +375,8 @@ impl Client {
 		let ret = match String::from_utf8(arg) {
 			Ok(p) => p,
 			Err(_) => {
-				println!("format argument to utf8 string faild");
-				return Err(YaftpError::ArgumentUnvalid);
+				println_err!("format argument to utf8 string faild");
+				return Err(YaftpError::ArgumentError);
 			}
 		};
 	
@@ -379,7 +388,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -387,7 +396,7 @@ impl Client {
 		match self.send_command(3u8, 2).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -395,7 +404,7 @@ impl Client {
 		match self.send_argument(&mut srcpath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -403,7 +412,7 @@ impl Client {
 		match self.send_argument(&mut targetpath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -413,7 +422,7 @@ impl Client {
 				return Ok(p);
 			},
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		}
@@ -424,7 +433,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -432,7 +441,7 @@ impl Client {
 		match self.send_command(5u8, 2).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -440,7 +449,7 @@ impl Client {
 		match self.send_argument(&mut srcpath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -448,7 +457,7 @@ impl Client {
 		match self.send_argument(&mut targetpath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -458,7 +467,7 @@ impl Client {
 				return Ok(p);
 			},
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		}
@@ -469,7 +478,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -477,7 +486,7 @@ impl Client {
 		match self.send_command(4u8, 1).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -485,7 +494,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -495,7 +504,7 @@ impl Client {
 				return Ok(p);
 			},
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		}
@@ -506,7 +515,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -514,7 +523,7 @@ impl Client {
 		match self.send_command(6u8, 1).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -522,7 +531,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -532,7 +541,7 @@ impl Client {
 				return Ok(p);
 			},
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		}
@@ -543,7 +552,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -551,7 +560,7 @@ impl Client {
 		match self.send_command(7u8, 3).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -559,7 +568,7 @@ impl Client {
 		match self.send_argument(&mut remotepath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -567,7 +576,7 @@ impl Client {
 		match self.send_argument(&mut start_pos.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -575,7 +584,7 @@ impl Client {
 		let mut f = match fs::File::open(localpath.clone()).await{
 			Ok(f) => f,
 			Err(_) => {
-				println!("open local file faild : {}" , localpath);
+				println_err!("open local file faild : {}" , localpath);
 				return Err(YaftpError::UnknownError);
 			},
 		};
@@ -593,7 +602,7 @@ impl Client {
 		match self.conn.write_all(&size.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("file transfer faild : {}" ,e);
+				println_err!("file transfer faild : {}" ,e);
 				return Err(YaftpError::UnknownNetwordError);
 			}
 		};
@@ -604,7 +613,7 @@ impl Client {
 			let a = match f.read(&mut buf).await{
 				Ok(p) => p,
 				Err(e) => {
-					println!("file transfer faild : {}" , e);
+					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
@@ -612,7 +621,7 @@ impl Client {
 			match self.conn.write_all(&buf[..a]).await{
 				Ok(p) => p,
 				Err(e) => {
-					println!("file transfer faild : {}" , e);
+					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
@@ -629,13 +638,11 @@ impl Client {
 		let _ = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
 	
-		println!("file transfer success!");
-
 		Ok(remotepath)
 	}
 
@@ -644,7 +651,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -652,7 +659,7 @@ impl Client {
 		match self.send_command(8u8, 2).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -660,7 +667,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -668,7 +675,7 @@ impl Client {
 		match self.send_argument(&mut start_pos.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -676,7 +683,7 @@ impl Client {
 		let _ = match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -693,7 +700,7 @@ impl Client {
 		match self.conn.read_exact(&mut argument_size).await{
 			Ok(_) => {},
 			Err(_) => {
-				println!("read file size faild!");
+				println_err!("read file size faild!");
 				return Err(YaftpError::UnknownNetwordError);
 			},
 		};
@@ -711,7 +718,7 @@ impl Client {
 		let mut f = match fs::File::create(filename.clone()).await{
 			Ok(f) => f,
 			Err(_) => {
-				println!("create local file faild : {}" , filename);
+				println_err!("create local file faild : {}" , filename);
 				return Err(YaftpError::UnknownError);
 			},
 		};
@@ -722,7 +729,7 @@ impl Client {
 			let a = match self.conn.read(&mut buf).await{
 				Ok(p) => p,
 				Err(e) => {
-					println!("file transfer faild : {}" , e);
+					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
@@ -730,7 +737,7 @@ impl Client {
 			match f.write_all(&buf[..a]).await{
 				Ok(p) => p,
 				Err(e) => {
-					println!("file transfer faild : {}" , e);
+					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
@@ -743,7 +750,6 @@ impl Client {
 		}
 
 		f.close().await.unwrap();
-		println!("file transfer success!");
 
 		Ok(filename)
 	}
@@ -753,7 +759,7 @@ impl Client {
 		match self.handshake().await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp handshake error");
+				println_err!("yaftp handshake error");
 				return Err(e);
 			},
 		};
@@ -761,7 +767,7 @@ impl Client {
 		match self.send_command(10u8, 2).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send command error");
+				println_err!("yaftp send command error");
 				return Err(e);
 			},
 		};
@@ -769,7 +775,7 @@ impl Client {
 		match self.send_argument(&mut path.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -777,7 +783,7 @@ impl Client {
 		match self.send_argument(&mut end_pos.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
-				println!("yaftp send argument error");
+				println_err!("yaftp send argument error");
 				return Err(e);
 			},
 		};
@@ -785,7 +791,7 @@ impl Client {
 		match self.read_reply().await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("server error code : {}" , e);
+				println_err!("server error code : {}" , e);
 				return Err(e);
 			},
 		};
@@ -793,7 +799,7 @@ impl Client {
 		let arg = match self.read_argument(32).await{
 			Ok(p) => p,
 			Err(e) => {
-				println!("yaftp read argument error");
+				println_err!("yaftp read argument error");
 				return Err(e);
 			},
 		};
@@ -801,8 +807,8 @@ impl Client {
 		let ret = match String::from_utf8(arg) {
 			Ok(p) => p,
 			Err(_) => {
-				println!("format argument to utf8 string faild");
-				return Err(YaftpError::ArgumentUnvalid);
+				println_err!("format argument to utf8 string faild");
+				return Err(YaftpError::ArgumentError);
 			}
 		};
 	
