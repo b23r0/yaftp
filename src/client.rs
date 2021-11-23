@@ -4,6 +4,7 @@ use std::{io::{Error, SeekFrom}, net::Shutdown};
 use crate::common::{YaftpError, retcode_error};
 use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use async_std::{fs::{self, File}, net::{TcpStream}};
+use indicatif::{ProgressBar, ProgressStyle};
 
 pub struct Client {
 	conn : TcpStream
@@ -618,10 +619,17 @@ impl Client {
 			}
 		};
 
+		let pb = ProgressBar::new(size);
+		pb.set_style(ProgressStyle::default_bar()
+			.template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+			.progress_chars("#>-"));
+	
+
 		loop{
 			let a = match f.read(&mut buf).await{
 				Ok(p) => p,
 				Err(e) => {
+					pb.finish_with_message("[-] file transfer faild");
 					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
@@ -634,17 +642,20 @@ impl Client {
 			match self.conn.write_all(&buf[..a]).await{
 				Ok(p) => p,
 				Err(e) => {
+					pb.finish_with_message("[-] file transfer faild");
 					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
-
+			pb.set_position(sum);
 			sum += a as u64;
 
 			if sum >= size {
 				break
 			}
 		}
+
+		pb.finish_with_message("[+] finished");
 
 		f.close().await.unwrap();
 
@@ -759,12 +770,18 @@ impl Client {
 			};
 		}
 
+		let pb = ProgressBar::new(size);
+		pb.set_style(ProgressStyle::default_bar()
+			.template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+			.progress_chars("#>-"));
+
 		let mut buf = [0;2048];
 		let mut sum = 0u64;
 		loop{
 			let a = match self.conn.read(&mut buf).await{
 				Ok(p) => p,
 				Err(e) => {
+					pb.finish_with_message("[-] finished");
 					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
@@ -773,17 +790,21 @@ impl Client {
 			match f.write_all(&buf[..a]).await{
 				Ok(p) => p,
 				Err(e) => {
+					pb.finish_with_message("[-] finished");
 					println_err!("file transfer faild : {}" , e);
 					return Err(YaftpError::UnknownError);
 				},
 			};
 
+			pb.set_position(sum);
 			sum += a as u64;
 
 			if sum >= size {
 				break
 			}
 		}
+
+		pb.finish_with_message("[+] finished");
 
 		f.close().await.unwrap();
 
