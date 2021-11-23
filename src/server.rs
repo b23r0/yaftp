@@ -1,10 +1,10 @@
 include!{"utils.rs"}
 
 use crate::common::{YaftpError, error_retcode};
-use std::{fs, io::{Read, SeekFrom}, net::Shutdown, path::{Path}};
+use std::{fs, io::{SeekFrom}, net::Shutdown, path::{Path}};
 
 use futures::{AsyncReadExt, AsyncWriteExt};
-use async_std::{io::{self, prelude::SeekExt}, net::{TcpStream}};
+use async_std::{fs::File, io::{self, prelude::SeekExt}, net::{TcpStream}};
 use chrono::DateTime;
 use chrono::offset::Utc;
 use path_absolutize::*;
@@ -958,22 +958,49 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 
 		let path = path.to_str().unwrap().to_string();
 
-		let mut f = match async_std::fs::File::create(path).await{
-			Ok(p) => p,
-			Err(e) => {
-				if e.kind() == std::io::ErrorKind::PermissionDenied {
-					ret = error_retcode(YaftpError::NoPermission);
-				} else if e.kind() == std::io::ErrorKind::NotFound {
-					ret = error_retcode(YaftpError::NotFound);
-				} else {
-					print!("error : {}" , e);
-					ret = error_retcode(YaftpError::UnknownError);
-				}
-				break;
-			}
-		};
+		let mut f : File;
 
-		match f.seek(SeekFrom::Start(start_pos)).await{
+		if start_pos == 0{
+			f = match async_std::fs::File::create(path).await{
+				Ok(p) => p,
+				Err(e) => {
+					if e.kind() == std::io::ErrorKind::PermissionDenied {
+						ret = error_retcode(YaftpError::NoPermission);
+					} else if e.kind() == std::io::ErrorKind::NotFound {
+						ret = error_retcode(YaftpError::NotFound);
+					} else {
+						print!("error : {}" , e);
+						ret = error_retcode(YaftpError::UnknownError);
+					}
+					break;
+				}
+			};
+		} else {
+			f = match async_std::fs::OpenOptions::new().write(true).read(true).open(path).await{
+				Ok(p) => p,
+				Err(e) => {
+					if e.kind() == std::io::ErrorKind::PermissionDenied {
+						ret = error_retcode(YaftpError::NoPermission);
+					} else if e.kind() == std::io::ErrorKind::NotFound {
+						ret = error_retcode(YaftpError::NotFound);
+					} else {
+						print!("error : {}" , e);
+						ret = error_retcode(YaftpError::UnknownError);
+					}
+					break;
+				}
+			};
+		}
+
+
+
+		let mut pos = SeekFrom::Start(start_pos);
+
+		if start_pos == f.metadata().await.unwrap().len() {
+			pos = SeekFrom::End(0);
+		}
+
+		match f.seek(pos).await{
 			Ok(_) => {},
 			Err(_) => {
 				ret = error_retcode(YaftpError::StartPosError);
@@ -1146,7 +1173,7 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 		+-----------------+---------------------+
 		*/
 
-		let size = f.metadata().await.unwrap().len();
+		let size = f.metadata().await.unwrap().len() - start_pos;
 
 		match stream.write_all(&size.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
@@ -1170,6 +1197,8 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 				break;
 			}
 		};
+
+		f.close().await.unwrap();
 
 		break;
 	}
@@ -1242,7 +1271,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			},
 		};
 
-		let mut f = match fs::File::open(&path){
+		let mut f = match async_std::fs::File::open(&*path).await{
 			Ok(p) => p,
 			Err(e) => {
 				if e.kind() == std::io::ErrorKind::PermissionDenied {
@@ -1257,7 +1286,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			},
 		};
 
-		if end_pos > f.metadata().unwrap().len(){
+		if end_pos > f.metadata().await.unwrap().len(){
 			ret = error_retcode(YaftpError::EndPosError);
 			break;
 		}
@@ -1269,7 +1298,23 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 		let mut sum : u64 = 0;
 		loop{
 
-			let n = match f.read(&mut buffer) {
+			if (end_pos - sum) <= 1024 * 1024 * 20 {
+
+				let mut last_buf = vec![0u8; (end_pos - sum) as usize].into_boxed_slice();
+				match f.read_exact(&mut last_buf).await {
+					Ok(n) => n,
+					Err(_) => {
+						ret = error_retcode(YaftpError::ReadFileError);
+						break;
+					},
+				};
+
+				md5.update(&last_buf);
+
+				break;
+			}
+
+			let n = match f.read(&mut buffer).await {
 				Ok(n) => n,
 				Err(_) => {
 					ret = error_retcode(YaftpError::ReadFileError);
@@ -1278,13 +1323,13 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			};
 			sum += n as u64;
 			md5.update(&buffer[..n]);
+
 			if n == 0 {
 				break;
 			}
-			if sum == end_pos {
-				break;
-			}
 		}
+
+		f.close().await.unwrap();
 
 		let mut md5_str = String::new();
 

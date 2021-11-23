@@ -1,9 +1,9 @@
 include!("utils.rs");
 
-use std::{io::Error, net::Shutdown};
+use std::{io::{Error, SeekFrom}, net::Shutdown};
 use crate::common::{YaftpError, retcode_error};
-use futures::{AsyncReadExt, AsyncWriteExt};
-use async_std::{fs, net::{TcpStream}};
+use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use async_std::{fs::{self, File}, net::{TcpStream}};
 
 pub struct Client {
 	conn : TcpStream
@@ -597,7 +597,7 @@ impl Client {
 		+-----------------+---------------------+
 		*/
 
-		let size = f.metadata().await.unwrap().len();
+		let size = f.metadata().await.unwrap().len() - start_pos;
 
 		match self.conn.write_all(&size.to_be_bytes().to_vec()).await{
 			Ok(_) => {},
@@ -609,6 +609,15 @@ impl Client {
 
 		let mut buf = [0;2048];
 		let mut sum = 0u64;
+
+		match f.seek(SeekFrom::Start(start_pos)).await{
+			Ok(_) => {},
+			Err(e) => {
+				println_err!("local file seek pos faild : {}" ,e);
+				return Err(YaftpError::StartPosError);
+			}
+		};
+
 		loop{
 			let a = match f.read(&mut buf).await{
 				Ok(p) => p,
@@ -617,6 +626,10 @@ impl Client {
 					return Err(YaftpError::UnknownError);
 				},
 			};
+
+			if a == 0 {
+				break;
+			}
 
 			match self.conn.write_all(&buf[..a]).await{
 				Ok(p) => p,
@@ -646,7 +659,7 @@ impl Client {
 		Ok(remotepath)
 	}
 
-	pub async fn get(self : &mut Client , path : String , start_pos : u64) -> Result<String,YaftpError> {
+	pub async fn get(self : &mut Client ,localpath : String ,remotepath : String , start_pos : u64) -> Result<String,YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -664,7 +677,7 @@ impl Client {
 			},
 		};
 
-		match self.send_argument(&mut path.as_bytes().to_vec()).await{
+		match self.send_argument(&mut remotepath.as_bytes().to_vec()).await{
 			Ok(_) => {},
 			Err(e) => {
 				println_err!("yaftp send argument error");
@@ -707,21 +720,44 @@ impl Client {
 
 		let size = u64::from_be_bytes(argument_size);
 
-		let filename : String;
+		let mut f : File;
 
-		if path.as_bytes()[0] == '/' as u8 {
-			filename = path.split_at(path.rfind('/').unwrap() + 1).1.to_string();
+		if start_pos == 0{
+			f = match fs::File::create(localpath.clone()).await{
+				Ok(f) => f,
+				Err(_) => {
+					println_err!("create local file faild : {}" , localpath);
+					return Err(YaftpError::UnknownError);
+				},
+			};
 		} else {
-			filename = path.split_at(path.rfind('\\').unwrap() + 1).1.to_string();
+			f = match async_std::fs::OpenOptions::new().write(true).read(true).open(localpath.clone()).await{
+				Ok(p) => p,
+				Err(_) => {
+					println_err!("open local file faild : {}" , localpath);
+					return Err(YaftpError::UnknownError);
+				}
+			};
 		}
 
-		let mut f = match fs::File::create(filename.clone()).await{
-			Ok(f) => f,
-			Err(_) => {
-				println_err!("create local file faild : {}" , filename);
-				return Err(YaftpError::UnknownError);
-			},
-		};
+		if start_pos != 0 {
+
+			let pos : SeekFrom;
+
+			if start_pos == f.metadata().await.unwrap().len(){
+				pos = SeekFrom::End(0);
+			} else {
+				pos = SeekFrom::Start(start_pos);
+			}
+
+			match f.seek(pos).await{
+				Ok(_) => {},
+				Err(e) => {
+					println_info!("seek local file faild : {}" , e);
+					return Err(YaftpError::StartPosError);
+				},
+			};
+		}
 
 		let mut buf = [0;2048];
 		let mut sum = 0u64;
@@ -751,7 +787,7 @@ impl Client {
 
 		f.close().await.unwrap();
 
-		Ok(filename)
+		Ok(localpath)
 	}
 
 	pub async fn hash(self : &mut Client , path : String , end_pos : u64) -> Result<String,YaftpError> {

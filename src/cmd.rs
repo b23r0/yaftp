@@ -7,8 +7,12 @@ use std::io::Write;
 use crate::client;
 use crate::common::error_retcode;
 
+use async_std::fs;
 use console::Term;
 use console::style;
+use futures::AsyncReadExt;
+use futures::AsyncWriteExt;
+use md5::{Digest, Md5};
 use tabled::{Tabled, Table};
 
 #[derive(Tabled)]
@@ -625,6 +629,143 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
+			let filename : String;
+
+			if path.as_bytes()[0] == '/' as u8 {
+				filename = path.split_at(path.rfind('/').unwrap() + 1).1.to_string();
+			} else {
+				filename = path.split_at(path.rfind('\\').unwrap() + 1).1.to_string();
+			}
+
+			match fs::metadata(filename.clone()).await{
+				Ok(p) => {
+					println_info!("local file '{}' already exists" , filename);
+					let remote_file_size = info[1];
+					let local_file_size = p.len();
+
+					if local_file_size >= remote_file_size{
+						println_err!("local file and remote file size equal or bigger. please remove local file before execute command put.");
+						continue;
+					}
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println_err!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.hash(path.clone(), p.len()).await{
+						Ok(p) => {
+							
+							println_info!("remote file hash : {}" , p);
+							
+							let mut f = match fs::File::open(&filename).await{
+								Ok(p) => p,
+								Err(e) => {
+									println_err!("open local file faild : {}" , e);
+									continue;
+								},
+							};
+					
+							let mut md5 = Md5::default();
+					
+							let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
+							
+							let mut sum : u64 = 0;
+
+							let mut is_ok = false;
+
+							loop{
+					
+								if (local_file_size - sum) <= 1024 * 1024 * 20 {
+
+									let mut last_buf = vec![0u8; (local_file_size - sum) as usize].into_boxed_slice();
+									match f.read_exact(&mut last_buf).await {
+										Ok(n) => n,
+										Err(_) => {
+											break;
+										},
+									};
+					
+									md5.update(&last_buf);
+									is_ok = true;
+									break;
+								}
+
+								let n = match f.read(&mut buffer).await {
+									Ok(n) => n,
+									Err(_) => {
+										break;
+									},
+								};
+								sum += n as u64;
+								md5.update(&buffer[..n]);
+								if n == 0 {
+									is_ok = true;
+									break;
+								}
+							}
+
+							match f.close().await{
+								Ok(_) => {},
+								Err(e) => {
+									println_err!("close local file faild : {}" , e);
+									continue;
+								},
+							};
+
+							if !is_ok {
+								println_err!("calc local file hash faild !");
+								continue;
+							}
+
+							let mut md5_str = String::new();
+
+							for b in md5.finalize(){
+								let a = format!("{:02x}", b);
+								md5_str += &a;
+							}
+
+							println_info!("local file hash : {}" , md5_str);
+
+							if md5_str != p{
+								println_err!("remote file and local file hash not equal. please remove remote file before execute command put.");
+								continue;
+							}
+
+							println_info!("start resume broken transfer");
+
+							let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+								Ok(p) => p,
+								Err(_) => {
+									println_err!("connect to {}:{} faild", ip ,port);
+									continue;
+								},
+							};
+				
+							match client.get(filename.clone() , path.clone() , local_file_size).await{
+								Ok(_) => {
+									println_info!("file transfer success!");
+								},
+								Err(_) => {
+									continue;
+								},
+							};
+							continue;
+						},
+						Err(e) => {
+							println_info!("calc remote file hash faild : {} ", e);
+							continue;
+						},
+					}
+				},
+				Err(_) => {
+					println_info!("start file transfer");
+				},
+			};
+
 			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
 				Ok(p) => p,
 				Err(_) => {
@@ -633,7 +774,7 @@ pub async fn handle_cmd(ip : String , port : String){
 				},
 			};
 
-			match client.get(path.clone() , 0).await{
+			match client.get(filename.clone() , path.clone() , 0).await{
 				Ok(_) => {
                     println_info!("file transfer success!");
                 },
@@ -675,8 +816,125 @@ pub async fn handle_cmd(ip : String , port : String){
 			};
 
 			match client.info(remotepath.clone()).await{
-				Ok(_) => {
-					println_err!("'{}' remote file already exists" ,localpath);
+				Ok(p) => {
+					println_info!("remote file '{}' already exists" , p.1);
+					let size = p.0[1];
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println_err!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.hash(p.1, size).await{
+						Ok(p) => {
+							println_info!("remote file hash : {}" , p);
+
+							let mut f = match fs::File::open(&localpath).await{
+								Ok(p) => p,
+								Err(e) => {
+									println_err!("open local file faild : {}" , e);
+									continue;
+								},
+							};
+					
+							if size >= f.metadata().await.unwrap().len(){
+								println_err!("remote file and local file size equal or bigger. please remove remote file before execute command put.");
+								continue;
+							}
+					
+							let mut md5 = Md5::default();
+					
+							let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
+							
+							let mut sum : u64 = 0;
+
+							let mut is_ok = false;
+
+							loop{
+					
+								if (size - sum) <= 1024 * 1024 * 20 {
+
+									let mut last_buf = vec![0u8; (size - sum) as usize].into_boxed_slice();
+									match f.read_exact(&mut last_buf).await {
+										Ok(n) => n,
+										Err(_) => {
+											break;
+										},
+									};
+					
+									md5.update(&last_buf);
+									is_ok = true;
+									break;
+								}
+
+								let n = match f.read(&mut buffer).await {
+									Ok(n) => n,
+									Err(_) => {
+										break;
+									},
+								};
+								sum += n as u64;
+								md5.update(&buffer[..n]);
+								if n == 0 {
+									is_ok = true;
+									break;
+								}
+							}
+
+							match f.close().await{
+								Ok(_) => {},
+								Err(e) => {
+									println_err!("close local file faild : {}" , e);
+									continue;
+								},
+							};
+
+							if !is_ok {
+								println_err!("calc local file hash faild !");
+								continue;
+							}
+
+							let mut md5_str = String::new();
+
+							for b in md5.finalize(){
+								let a = format!("{:02x}", b);
+								md5_str += &a;
+							}
+
+							println_info!("local file hash : {}" , md5_str);
+
+							if md5_str != p{
+								println_err!("remote file and local file hash not equal. please remove remote file before execute command put.");
+								continue;
+							}
+						},
+						Err(e) => {
+							println_err!("calc remote file hash faild : {}" , e );
+							continue;
+						},
+					};
+
+					println_info!("start resume broken transfer!");
+
+					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+						Ok(p) => p,
+						Err(_) => {
+							println_err!("connect to {}:{} faild", ip ,port);
+							continue;
+						},
+					};
+
+					match client.put(localpath , remotepath , size).await{
+						Ok(_) => {
+							println_info!("file transfer success!");
+						},
+						Err(_) => {
+							continue;
+						},
+					};
 					continue;
 				},
 				Err(_) => {},
