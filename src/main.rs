@@ -1,3 +1,4 @@
+use client::SpawnClient;
 use futures::{StreamExt};
 use async_std::{io, net::{TcpListener}, task};
 use log::LevelFilter;
@@ -73,7 +74,9 @@ async fn main() -> io::Result<()>  {
 				Some(p) => p
 			};
 
-			cmd::handle_cmd(ip , port).await;
+			let spawner = SpawnClient::new(&ip , &port).await;
+
+			cmd::handle_cmd(spawner).await;
 		},
 		"-t" => {
 		},

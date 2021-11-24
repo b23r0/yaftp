@@ -3,7 +3,7 @@ use std::fmt;
 use std::error;
 use std::io::Write;
 
-use crate::client;
+use crate::client::SpawnClient;
 use crate::common::error_retcode;
 use crate::println_err;
 use crate::println_info;
@@ -186,7 +186,7 @@ pub fn cmd_format(input : String) -> Result<Vec<String> , CmdError>{
 	Ok(ret)
 }
 
-fn pre_handle_path (path : String , cwd : String) -> String{
+fn pre_handle_path (path : &String , cwd : &String) -> String{
 
 	let mut cdpath : String;
 
@@ -225,25 +225,25 @@ fn pre_handle_path (path : String , cwd : String) -> String{
 			if is_windows {
 				if path.len() > 1 {
 					if path.as_bytes()[1] == ':' as u8 {
-						cdpath = path;
+						cdpath = path.clone();
 						break;
 					} 
 				}
 
 				if cwd.len() == 3 {
-					cdpath = cwd + &path;
+					cdpath = cwd.clone() + &path.clone();
 				} else {
-					cdpath = [cwd , path].join("\\");
+					cdpath = [cwd.clone() , path.clone()].join("\\");
 				}
 			} else {
 				if path.as_bytes()[0] == '/' as u8{
-					cdpath = path;
+					cdpath = path.clone();
 					break;
 				}
 				if cwd == "/" {
-					cdpath = cwd + &path;
+					cdpath = cwd.clone() + &path.clone();
 				} else {
-					cdpath = [cwd , path].join("/");
+					cdpath = [cwd.clone() , path.clone()].join("/");
 				}
 			}
 			break;
@@ -253,13 +253,13 @@ fn pre_handle_path (path : String , cwd : String) -> String{
 	cdpath
 }
 
-pub async fn handle_cmd(ip : String , port : String){
+pub async fn handle_cmd(spawn : SpawnClient){
 
 	let mut term = Term::stdout();
-	let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+	let mut client = match spawn.spawn().await{
 		Ok(p) => p,
 		Err(_) => {
-            println_err!("connect to {}:{} faild!" , ip ,port);
+            println_err!("connect faild!");
             return;
         } ,
 	};
@@ -300,14 +300,14 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
-			let result = match client.ls(String::from(cwd.clone())).await{
+			let result = match client.ls(&cwd).await{
 				Ok(p) => p,
 				Err(_) => {
 					println_err!("command execute faild");
@@ -336,21 +336,21 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let cdpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let cdpath = pre_handle_path(&cmd[1], &cwd);
 
 			if cdpath.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let (ret, path) = match client.info(cdpath.clone()).await{
+			let (ret, path) = match client.info(&cdpath).await{
 				Ok(p) => p,
 				Err(e) => {
                     println_err!("get cd target path information faild : {}" , e);
@@ -372,27 +372,27 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let srcpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let srcpath = pre_handle_path(&cmd[1], &cwd);
 
 			if srcpath.len() == 0{
 				continue;
 			}
 
-			let targetpath = pre_handle_path(cmd[2].clone(), cwd.clone());
+			let targetpath = pre_handle_path(&cmd[2], &cwd);
 
 			if targetpath.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let (ret, _) = match client.info(srcpath.clone()).await{
+			let (ret, _) = match client.info(&srcpath).await{
 				Ok(p) => p,
 				Err(e) => {
                     println_err!("read source path infomation faild : {}" , e);
@@ -405,15 +405,15 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let _ = match client.cp(srcpath.clone() , targetpath.clone()).await{
+			let _ = match client.cp(&srcpath , &targetpath).await{
 				Ok(_) => {
 					println_err!("copy file '{}' to '{}' success" , srcpath , targetpath);
 				},
@@ -430,21 +430,21 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let path = pre_handle_path(&cmd[1], &cwd);
 
 			if path.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let _ = match client.mkd(path.clone()).await{
+			let _ = match client.mkd(&path).await{
 				Ok(_) => {
 					println_info!("mkdir '{}' success" , path);
 				},
@@ -461,29 +461,29 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let srcpath = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let srcpath = pre_handle_path(&cmd[1], &cwd);
 
 			if srcpath.len() == 0{
                 println_err!("command error , please check argument format");
 				continue;
 			}
 
-			let targetpath = pre_handle_path(cmd[2].clone(), cwd.clone());
+			let targetpath = pre_handle_path(&cmd[2], &cwd);
 
 			if targetpath.len() == 0{
                 println_err!("command error , please check argument format");
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let (ret, _) = match client.info(srcpath.clone()).await{
+			let (ret, _) = match client.info(&srcpath).await{
 				Ok(p) => p,
 				Err(e) => {
                     println_err!("read source path infomation faild : {}" , e);
@@ -496,15 +496,15 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let _ = match client.mv(srcpath.clone() , targetpath.clone()).await{
+			let _ = match client.mv(&srcpath , &targetpath).await{
 				Ok(_) => {
 					println_info!("move file '{}' to '{}' success" , srcpath , targetpath);
 				},
@@ -520,21 +520,21 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let path = pre_handle_path(&cmd[1], &cwd);
 
 			if path.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let _ = match client.rm(path.clone()).await{
+			let _ = match client.rm(&path).await{
 				Ok(_) => {
 					println_info!("remove '{}' success" , path);
 				},
@@ -550,21 +550,21 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let path = pre_handle_path(&cmd[1], &cwd);
 
 			if path.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let (info, abspath) = match client.info(path.clone()).await{
+			let (info, abspath) = match client.info(&path).await{
 				Ok(p) => p,
 				Err(e) => {
                     println_err!("read file information faild : {}" , e);
@@ -577,15 +577,15 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			match client.hash(path.clone() , info[1]).await{
+			match client.hash(&path , info[1]).await{
 				Ok(p) => {
 					println_info!("{}", p);
 				},
@@ -602,21 +602,21 @@ pub async fn handle_cmd(ip : String , port : String){
 				continue;
 			}
 
-			let path = pre_handle_path(cmd[1].clone(), cwd.clone());
+			let path = pre_handle_path(&cmd[1], &cwd);
 
 			if path.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			let (info, abspath) = match client.info(path.clone()).await{
+			let (info, abspath) = match client.info(&path).await{
 				Ok(p) => p,
 				Err(e) => {
                     println_err!("read file infomation faild : {}" , e);
@@ -648,15 +648,15 @@ pub async fn handle_cmd(ip : String , port : String){
 						continue;
 					}
 
-					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+					let mut client = match spawn.spawn().await{
 						Ok(p) => p,
-						Err(_) => {
-							println_err!("connect to {}:{} faild", ip ,port);
+						Err(e) => {
+							println_err!("connect error : {}", e);
 							continue;
 						},
 					};
 
-					match client.hash(path.clone(), p.len()).await{
+					match client.hash(&path, p.len()).await{
 						Ok(p) => {
 							
 							println_info!("remote file hash : {}" , p);
@@ -693,15 +693,15 @@ pub async fn handle_cmd(ip : String , port : String){
 
 							println_info!("start resume broken transfer");
 
-							let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+							let mut client = match spawn.spawn().await{
 								Ok(p) => p,
-								Err(_) => {
-									println_err!("connect to {}:{} faild", ip ,port);
+								Err(e) => {
+									println_err!("connect error : {}", e);
 									continue;
 								},
 							};
 				
-							match client.get(filename.clone() , path.clone() , local_file_size).await{
+							match client.get(&filename , &path , local_file_size).await{
 								Ok(_) => {
 									println_info!("file transfer success!");
 								},
@@ -722,15 +722,15 @@ pub async fn handle_cmd(ip : String , port : String){
 				},
 			};
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			match client.get(filename.clone() , path.clone() , 0).await{
+			match client.get(&filename , &path , 0).await{
 				Ok(_) => {
                     println_info!("file transfer success!");
                 },
@@ -757,34 +757,34 @@ pub async fn handle_cmd(ip : String , port : String){
 				filename = localpath.split_at(localpath.rfind('\\').unwrap() + 1).1.to_string();
 			}
 
-			let remotepath = pre_handle_path(filename, cwd.clone());
+			let remotepath = pre_handle_path(&filename, &cwd);
 
 			if localpath.len() == 0{
 				continue;
 			}
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			match client.info(remotepath.clone()).await{
+			match client.info(&remotepath).await{
 				Ok(p) => {
 					println_info!("remote file '{}' already exists" , p.1);
 					let size = p.0[1];
 
-					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+					let mut client = match spawn.spawn().await{
 						Ok(p) => p,
-						Err(_) => {
-							println_err!("connect to {}:{} faild", ip ,port);
+						Err(e) => {
+							println_err!("connect error : {}", e);
 							continue;
 						},
 					};
 
-					match client.hash(p.1, size).await{
+					match client.hash(&p.1, size).await{
 						Ok(p) => {
 							println_info!("remote file hash : {}" , p);
 
@@ -831,15 +831,15 @@ pub async fn handle_cmd(ip : String , port : String){
 
 					println_info!("start resume broken transfer!");
 
-					let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+					let mut client = match spawn.spawn().await{
 						Ok(p) => p,
-						Err(_) => {
-							println_err!("connect to {}:{} faild", ip ,port);
+						Err(e) => {
+							println_err!("connect error : {}", e);
 							continue;
 						},
 					};
 
-					match client.put(localpath , remotepath , size).await{
+					match client.put(&localpath , &remotepath , size).await{
 						Ok(_) => {
 							println_info!("file transfer success!");
 						},
@@ -852,15 +852,15 @@ pub async fn handle_cmd(ip : String , port : String){
 				Err(_) => {},
 			};
 
-			let mut client = match client::Client::new(ip.clone() , port.clone()).await{
+			let mut client = match spawn.spawn().await{
 				Ok(p) => p,
-				Err(_) => {
-					println_err!("connect to {}:{} faild", ip ,port);
+				Err(e) => {
+					println_err!("connect error : {}", e);
 					continue;
 				},
 			};
 
-			match client.put(localpath , remotepath , 0).await{
+			match client.put(&localpath , &remotepath , 0).await{
 				Ok(_) => {
                     println_info!("file transfer success!");
                 },

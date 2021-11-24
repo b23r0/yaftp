@@ -1,5 +1,5 @@
 use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use async_std::{fs::{self, File}, net::{TcpStream}};
+use async_std::{fs::{self, File}, net::{TcpListener, TcpStream}};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use std::{io::{Error, SeekFrom}, net::Shutdown};
@@ -18,15 +18,50 @@ impl Drop for Client{
     }
 }
 
+pub struct SpawnClient {
+	master : Option<TcpStream>,
+	slave : Option<TcpListener>,
+	ip : String ,
+	port : String 
+
+}
+
+impl SpawnClient {
+
+	pub async fn new(ip : &String , port : &String) -> SpawnClient {
+		SpawnClient{ip : ip.clone() , port : port.clone() , master : None , slave : None}
+	}
+
+	pub async fn new_t(master : TcpStream , slave : TcpListener) -> SpawnClient {
+		SpawnClient{ip : String::new() , port : String::new() , master : Some(master) , slave : Some(slave)}
+	}
+
+	pub async fn spawn(self : &SpawnClient) -> Result<Client , Error> {
+
+		if self.ip.len() == 0 {
+			self.master.as_ref().unwrap().write_all(&mut [0x55, 0x55].to_vec()).await?;
+			let (stream , _) = self.slave.as_ref().unwrap().accept().await?;
+
+			return Client::from(stream).await;
+		}
+
+		return Client::new(&self.ip , &self.port).await;
+	}
+}
+
 impl Client {
 	
-	pub async fn new(ip : String ,port : String) -> Result<Client , Error>{
+	pub async fn new(ip : &String ,port : &String) -> Result<Client , Error>{
 		let fulladdr = format!("{}:{}", ip ,port);
 		let conn = match TcpStream::connect(fulladdr).await{
 			Ok(p) => p,
 			Err(e) => return Err(e),
 		};
 		
+		return Ok(Client{conn : conn});
+	}
+
+	pub async fn from(conn : TcpStream) -> Result<Client , Error> {
 		return Ok(Client{conn : conn});
 	}
 
@@ -45,13 +80,6 @@ impl Client {
 			},
 		};
 
-		/*
-		+-------+----------+---------------+
-		|  VER  | NMETHODS | METHODS	   |
-		+-------+----------+---------------+
-		| 1(u8) |   1(u8)  | 1 to 255 (u8) |
-		+-------+----------+---------------+
-		*/
 		let mut header = [0u8;2];
 		match self.conn.read_exact(&mut header).await{
 			Ok(_) => {},
@@ -181,7 +209,7 @@ impl Client {
 		Ok(arg.to_vec())
 	}
 
-	pub async fn ls(self : &mut Client , path : String) -> Result<Vec<String> ,YaftpError> {
+	pub async fn ls(self : &mut Client , path : &String) -> Result<Vec<String> ,YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -240,7 +268,7 @@ impl Client {
 		Ok(ret)
 	}
 
-	pub async fn info(self : &mut Client , path : String) -> Result<(Vec<u64> , String),YaftpError> {
+	pub async fn info(self : &mut Client , path : &String) -> Result<(Vec<u64> , String),YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -383,7 +411,7 @@ impl Client {
 		Ok(ret)
 	}
 
-	pub async fn cp(self : &mut Client , srcpath : String , targetpath : String) -> Result<u32 , YaftpError> {
+	pub async fn cp(self : &mut Client , srcpath : &String , targetpath : &String) -> Result<u32 , YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -428,7 +456,7 @@ impl Client {
 		}
 	}
 
-	pub async fn mv(self : &mut Client , srcpath : String , targetpath : String) -> Result<u32 , YaftpError> {
+	pub async fn mv(self : &mut Client , srcpath : &String , targetpath : &String) -> Result<u32 , YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -473,7 +501,7 @@ impl Client {
 		}
 	}
 
-	pub async fn mkd(self : &mut Client , path : String) -> Result<u32 , YaftpError> {
+	pub async fn mkd(self : &mut Client , path : &String) -> Result<u32 , YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -510,7 +538,7 @@ impl Client {
 		}
 	}
 
-	pub async fn rm(self : &mut Client , path : String) -> Result<u32 , YaftpError> {
+	pub async fn rm(self : &mut Client , path : &String) -> Result<u32 , YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -547,7 +575,7 @@ impl Client {
 		}
 	}
 
-	pub async fn put(self : &mut Client , localpath : String ,remotepath : String , start_pos : u64) -> Result<String,YaftpError> {
+	pub async fn put(self : &mut Client , localpath : &String ,remotepath : &String , start_pos : u64) -> Result<String,YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -666,10 +694,10 @@ impl Client {
 			},
 		};
 	
-		Ok(remotepath)
+		Ok(remotepath.clone())
 	}
 
-	pub async fn get(self : &mut Client ,localpath : String ,remotepath : String , start_pos : u64) -> Result<String,YaftpError> {
+	pub async fn get(self : &mut Client ,localpath : &String ,remotepath : &String , start_pos : u64) -> Result<String,YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
@@ -807,10 +835,10 @@ impl Client {
 
 		f.close().await.unwrap();
 
-		Ok(localpath)
+		Ok(localpath.clone())
 	}
 
-	pub async fn hash(self : &mut Client , path : String , end_pos : u64) -> Result<String,YaftpError> {
+	pub async fn hash(self : &mut Client , path : &String , end_pos : u64) -> Result<String,YaftpError> {
 
 		match self.handshake().await{
 			Ok(_) => {},
