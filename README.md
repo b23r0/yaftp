@@ -36,11 +36,11 @@ then connect to server and get a shell
 
 First listen a port waiting for slave connected and get shell
 
-`$> ./rsocx -t 8000`
+`$> ./yaftp -t 8000`
 
 then reverse connect to master in slave
 
-`$> ./rsocx -r 127.0.0.1 8000`
+`$> ./yaftp -r 127.0.0.1 8000`
 
 # Protocol(v1)
 
