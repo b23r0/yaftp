@@ -18,7 +18,7 @@ Support with resume broken transfer & reverse mode & largefile.
 
 # Installation
 
-`$> cargo install rsocx`
+`$> cargo install yaftp`
 
 # Usage
 
