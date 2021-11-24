@@ -1,7 +1,12 @@
 [package]
 name = "yaftp"
 version = "0.1.0"
+authors = ["b23r0 <b23r0@foxmail.com>"]
 edition = "2021"
+description = "Yet another File Transfer Protocol support with resume broken transfer & reverse mode & largefile implementation by Rust."
+repository = "https://github.com/b23r0/yaftp"
+readme = "README.md"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

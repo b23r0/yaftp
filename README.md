@@ -1,9 +1,35 @@
-# yaftp
-Yet Another File Transfer Protocol.
+# yaftp [![Build Status](https://app.travis-ci.com/b23r0/yaftp.svg?branch=main)](https://app.travis-ci.com/b23r0/yaftp) [![ChatOnDiscord](https://img.shields.io/badge/chat-on%20discord-blue)](https://discord.gg/ZKtYMvDFN4) [![Crate](https://img.shields.io/crates/v/yaftp)](https://crates.io/crates/yaftp)
+Yet another File Transfer Protocol support with resume broken transfer & reverse mode & largefile implementation by Rust.
 
 # Build & Run
 
 `$> cargo build --release`
+
+# Installation
+
+`$> cargo install rsocx`
+
+# Usage
+
+## Bind Mode
+
+You can run a yaftp server and listen port at 8000
+
+`$> ./yaftp -l 8000`
+
+then connect to server and get a shell
+
+`$> ./yaftp -c 127.0.0.1 8000`
+
+## Reverse Mode
+
+First listen a port waiting for slave connected and get shell
+
+`$> ./rsocx -t 8000`
+
+then reverse connect to master in slave
+
+`$> ./rsocx -r 127.0.0.1 8000`
 
 # Features
 
@@ -12,8 +38,9 @@ Yet Another File Transfer Protocol.
 * Per something per session
 * Support large file
 * Support Resume broken transfer
+* Support reverse mode(cross firewall)
 
-# Protocol
+# Protocol(v1)
 
 ## Data Type
 
@@ -47,7 +74,7 @@ Yet Another File Transfer Protocol.
 
 fisrt , client will send client version and support methods . 
 
-In yaftp version 1.0 , only support 10 methods.
+In version 1.0 , only support 10 methods.
 
 ```
 +------+-----------+
@@ -85,9 +112,9 @@ In yaftp version 1.0 , only support 10 methods.
 +-------+----------+---------------+
 ```
 
-yaftp will reply server version and support methods.
+client will reply to server version and support methods.
 
-## Send Command
+## Command Request
 
 ```
 +-------+--------+
@@ -130,8 +157,6 @@ next , we need know every command argument and type.
 +---------+------+---------------------------------+-----------------------+-----------------------+
 ```
 
-Note : all path max size < 1024 bytes. you need check it.
-
 ## Command Reply
 
 server received command arguments will check if valid and reply a code and arguments count.
@@ -150,35 +175,47 @@ if check vaild return 0x00 , else return 1~255.
 +-----------+-----------------------------+
 |  RETCODE  |  Reason                     |
 +-----------+-----------------------------+
-|  1        |  not support the version    |
+|  1        |  NoSupportVersion           |
 +-----------+-----------------------------+
-|  2        |  not support the command    |
+|  2        |  NoSupportCommand           |
 +-----------+-----------------------------+
-|  3        |  no permission              |
+|  3        |  NoPermission               |
 +-----------+-----------------------------+
-|  4        |  not found                  |
+|  4        |  NotFound                   |
 +-----------+-----------------------------+
-|  5        |  start pos unvalid          |
+|  5        |  StartPosError              |
 +-----------+-----------------------------+
-|  6        |  end pos unvalid            |
+|  6        |  EndPosError                |
 +-----------+-----------------------------+
-|  7        |  check hash faild           |
+|  7        |  ArgumentSizeError          |
 +-----------+-----------------------------+
-|  8        |  argument count error       |
+|  8        |  ArgumentError              |
 +-----------+-----------------------------+
-|  9        |  argument unvaild           |
+|  9        |  ArgumentCountError         |
 +-----------+-----------------------------+
-|  10       |  read folder faild          |
+|  10       |  ReadFolderFaild            |
 +-----------+-----------------------------+
-|  11       |  read cwd faild             |
+|  11       |  ReadCwdFaild               |
++-----------+-----------------------------+
+|  12       |  UTF8FormatError            |
++-----------+-----------------------------+
+|  13       |  ReadFileError              |
++-----------+-----------------------------+
+|  14       |  WriteFileError             |
++-----------+-----------------------------+
+|  15       |  CalcMd5Error               |
++-----------+-----------------------------+
+|  16       |  UnknownNetwordError        |
++-----------+-----------------------------+
+|  17       |  UnknownError               |
 +-----------+-----------------------------+
 ```
 
-Note : The yaftp protocol is full-duplex, so depending on the command, the returned data may not be returned until the command parameters are completely sent. Therefore, the returned data needs to be processed asynchronously. For example: after the put method submits the first three parameters, if check has any mistake it will directly return a non-zero retcode. 
+Note : The yaftp protocol is full-duplex, so depending on the command, the returned data may not be returned until the command parameters are completely sent. Therefore, the returned data needs to be processed asynchronously. 
 
-## Command Reply Arguments
+## Command Reply Format
 
-command reply arguments same with command arguments.
+command reply same with command request .
 
 ```
 +-----------------+---------------------+
@@ -191,16 +228,14 @@ command reply arguments same with command arguments.
 ### ls - 0x01
 
 ```
-+---------+-----------+-----------------------+-----------------------+
-| Command | NArg      | Arg1                  |  ArgN                 |
-+---------+-----------+-----------------------+-----------------------+
-| ls      | 0 or N    | column(string)        | row(string)           |
-+---------+-----------+-----------------------+-----------------------+
++---------+-----------+-----------------------+
+| Command | NArg      |  ArgN                 |
++---------+-----------+-----------------------+
+| ls      | 0 or N    | row(string)           |
++---------+-----------+-----------------------+
 ```
 
-command `ls` will return a table like ls list. First argument is columns use `|` split.
-
-others arguments is rows(use '|' split).
+command `ls` will return a table. every row split by `|`.
 
 ### cwd - 0x02
 
@@ -212,7 +247,7 @@ others arguments is rows(use '|' split).
 +---------+-----------+-----------------------+
 ```
 
-command `cwd` just return a code tell client if success.
+command `cwd` return server current work directory.
 
 ### cp - 0x03
 
@@ -224,7 +259,7 @@ command `cwd` just return a code tell client if success.
 +---------+------+
 ```
 
-command `cp` just return a code tell client if success.
+command `cp` return a code tell client if success.
 
 ### mkd - 0x04
 
@@ -236,7 +271,7 @@ command `cp` just return a code tell client if success.
 +---------+------+
 ```
 
-command `mkd` just return a code tell client if success.
+command `mkd` return a code tell client if success.
 
 ### mv - 0x05
 
@@ -248,7 +283,7 @@ command `mkd` just return a code tell client if success.
 +---------+------+
 ```
 
-command `mv` just return a code tell client if success.
+command `mv` return a code tell client if success.
 
 ### rm - 0x06
 
@@ -260,7 +295,7 @@ command `mv` just return a code tell client if success.
 +---------+------+
 ```
 
-command `rm` just return a code tell client if success.
+command `rm` return a code tell client if success.
 
 ### put - 0x07
 
@@ -284,7 +319,7 @@ command `put` just return a code tell client if success.
 +---------+-----------+-----------------------+
 ```
 
-command `get` if retcode eq 0 will send client request data.
+command `get` if retcode eq 0 will send client request file data.
 
 ### info - 0x09
 
@@ -312,6 +347,4 @@ command `hash` if retcode eq 0 will return request file data md5 hash.
 
 ## Finally
 
-Server will close the session connection.
-
-
+Server will close the connection session.
