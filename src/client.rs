@@ -39,7 +39,7 @@ impl SpawnClient {
 	pub async fn spawn(self : &SpawnClient) -> Result<Client , Error> {
 
 		if self.ip.len() == 0 {
-			self.master.as_ref().unwrap().write_all(&mut [0x55, 0x55].to_vec()).await?;
+			self.master.as_ref().unwrap().write_all(&mut [0x55].to_vec()).await?;
 			let (stream , _) = self.slave.as_ref().unwrap().accept().await?;
 
 			return Client::from(stream).await;
