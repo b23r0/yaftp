@@ -1,5 +1,16 @@
 # yaftp [![Build Status](https://app.travis-ci.com/b23r0/yaftp.svg?branch=main)](https://app.travis-ci.com/b23r0/yaftp) [![ChatOnDiscord](https://img.shields.io/badge/chat-on%20discord-blue)](https://discord.gg/ZKtYMvDFN4) [![Crate](https://img.shields.io/crates/v/yaftp)](https://crates.io/crates/yaftp)
-Yet another File Transfer Protocol support with resume broken transfer & reverse mode & largefile implementation by Rust.
+Yet another File Transfer Protocol implementation by Rust.
+
+Support with resume broken transfer & reverse mode & largefile.
+
+# Features
+
+* C2C
+* Lightweight
+* Per something per session
+* Support large file
+* Support Resume broken transfer
+* Support reverse mode(cross firewall)
 
 # Build & Run
 
@@ -30,15 +41,6 @@ First listen a port waiting for slave connected and get shell
 then reverse connect to master in slave
 
 `$> ./rsocx -r 127.0.0.1 8000`
-
-# Features
-
-* C2C
-* Lightweight
-* Per something per session
-* Support large file
-* Support Resume broken transfer
-* Support reverse mode(cross firewall)
 
 # Protocol(v1)
 
