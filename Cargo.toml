@@ -1,6 +1,6 @@
 [package]
 name = "yaftp"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["b23r0 <b23r0@foxmail.com>"]
 edition = "2021"
 description = "Yet another File Transfer Protocol support with resume broken transfer & reverse mode & largefile implementation by Rust."
