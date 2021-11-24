@@ -293,6 +293,22 @@ pub async fn handle_cmd(spawn : SpawnClient){
 			continue;
 		}
 
+		if cmd[0] == "help" {
+			println!("-------------------------- yaftp client command list ------------------------------");
+			println!("help                          - command usage information");
+			println!("ls                            - list of current work directory");
+			println!("cd    [path]                  - change current work directory");
+			println!("cp    [srcpath] [targetpath]  - copy file to target path");
+			println!("mv    [srcpath] [targetpath]  - move file to target path");
+			println!("rm    [path]                  - remove a file or folder");
+			println!("hash  [path]                  - calcatute a file hash");
+			println!("mkdir [path]                  - make directory");
+			println!("get   [remote path]           - download a file to local");
+			println!("put   [local path]            - upload a file to remote work directory");
+			println!("-----------------------------------------------------------------------------------");
+			continue;
+		}
+
 		if cmd[0] == "ls" {
 
 			if cmd.len() != 1{
