@@ -16,6 +16,7 @@ pub enum YaftpError {
 	UTF8FormatError,
 	ReadFileError,
 	WriteFileError,
+	CalcMd5Error,
 	UnknownNetwordError,
 	UnknownError
 }
@@ -38,6 +39,7 @@ impl fmt::Display for YaftpError {
 			Self::UTF8FormatError => write!(f, "UTF8_FORMAT_ERROR"),
 			Self::ReadFileError => write!(f, "READ_FILE_ERROR"),
 			Self::WriteFileError => write!(f, "WRITE_FILE_ERROR"),
+			Self::CalcMd5Error => write!(f, "CALC_MD5_ERROR"),
 			Self::UnknownNetwordError => write!(f, "UNKNOWN_NETWORD_ERROR"),
 			Self::UnknownError => write!(f, "UNKNOWN_ERROR"),
 		}
@@ -68,6 +70,7 @@ impl Debug for YaftpError {
 			Self::UTF8FormatError => write!(f, "UTF8_FORMAT_ERROR"),
 			Self::ReadFileError => write!(f, "READ_FILE_ERROR"),
 			Self::WriteFileError => write!(f, "WRITE_FILE_ERROR"),
+			Self::CalcMd5Error => write!(f, "CALC_MD5_ERROR"),
 			Self::UnknownNetwordError => write!(f, "UNKNOWN_NETWORD_ERROR"),
 			Self::UnknownError => write!(f, "UNKNOWN_ERROR"),
 		}
@@ -91,7 +94,8 @@ pub fn retcode_error(retcode : u8) -> YaftpError {
 		0x0c => YaftpError::UTF8FormatError,
 		0x0d => YaftpError::ReadFileError,
 		0x0e => YaftpError::WriteFileError,
-		0x0f => YaftpError::UnknownNetwordError,
+		0x0f => YaftpError::CalcMd5Error,
+		0x10 => YaftpError::UnknownNetwordError,
 		_ =>	YaftpError::UnknownError
 	}
 }
@@ -113,7 +117,8 @@ pub fn error_retcode(code : YaftpError) -> u8 {
 		YaftpError::UTF8FormatError => 0x0c,
 		YaftpError::ReadFileError => 0x0d,
 		YaftpError::WriteFileError => 0x0e,
-		YaftpError::UnknownNetwordError => 0x0f,
+		YaftpError::CalcMd5Error => 0x0f,
+		YaftpError::UnknownNetwordError => 0x10,
 		YaftpError::UnknownError => 0xff,
 	}
 }

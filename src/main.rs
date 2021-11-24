@@ -7,6 +7,7 @@ mod server;
 mod client;
 mod common;
 mod cmd;
+mod utils;
 
 fn usage() {
 	println!("yaftp - Yet Another File Transfer Protocol");

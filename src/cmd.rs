@@ -1,4 +1,3 @@
-include!("utils.rs");
 use std::fmt::Debug;
 use std::fmt;
 use std::error;
@@ -6,13 +5,14 @@ use std::io::Write;
 
 use crate::client;
 use crate::common::error_retcode;
+use crate::println_err;
+use crate::println_info;
+use crate::utils::calc_md5;
 
 use async_std::fs;
 use console::Term;
 use console::style;
-use futures::AsyncReadExt;
 use futures::AsyncWriteExt;
-use md5::{Digest, Md5};
 use tabled::{Tabled, Table};
 
 #[derive(Tabled)]
@@ -669,44 +669,7 @@ pub async fn handle_cmd(ip : String , port : String){
 								},
 							};
 					
-							let mut md5 = Md5::default();
-					
-							let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
-							
-							let mut sum : u64 = 0;
-
-							let mut is_ok = false;
-
-							loop{
-					
-								if (local_file_size - sum) <= 1024 * 1024 * 20 {
-
-									let mut last_buf = vec![0u8; (local_file_size - sum) as usize].into_boxed_slice();
-									match f.read_exact(&mut last_buf).await {
-										Ok(n) => n,
-										Err(_) => {
-											break;
-										},
-									};
-					
-									md5.update(&last_buf);
-									is_ok = true;
-									break;
-								}
-
-								let n = match f.read(&mut buffer).await {
-									Ok(n) => n,
-									Err(_) => {
-										break;
-									},
-								};
-								sum += n as u64;
-								md5.update(&buffer[..n]);
-								if n == 0 {
-									is_ok = true;
-									break;
-								}
-							}
+							let md5_str = calc_md5(&mut f , local_file_size).await;
 
 							match f.close().await{
 								Ok(_) => {},
@@ -716,16 +679,9 @@ pub async fn handle_cmd(ip : String , port : String){
 								},
 							};
 
-							if !is_ok {
+							if md5_str.len() == 0 {
 								println_err!("calc local file hash faild !");
 								continue;
-							}
-
-							let mut md5_str = String::new();
-
-							for b in md5.finalize(){
-								let a = format!("{:02x}", b);
-								md5_str += &a;
 							}
 
 							println_info!("local file hash : {}" , md5_str);
@@ -845,44 +801,7 @@ pub async fn handle_cmd(ip : String , port : String){
 								continue;
 							}
 					
-							let mut md5 = Md5::default();
-					
-							let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
-							
-							let mut sum : u64 = 0;
-
-							let mut is_ok = false;
-
-							loop{
-					
-								if (size - sum) <= 1024 * 1024 * 20 {
-
-									let mut last_buf = vec![0u8; (size - sum) as usize].into_boxed_slice();
-									match f.read_exact(&mut last_buf).await {
-										Ok(n) => n,
-										Err(_) => {
-											break;
-										},
-									};
-					
-									md5.update(&last_buf);
-									is_ok = true;
-									break;
-								}
-
-								let n = match f.read(&mut buffer).await {
-									Ok(n) => n,
-									Err(_) => {
-										break;
-									},
-								};
-								sum += n as u64;
-								md5.update(&buffer[..n]);
-								if n == 0 {
-									is_ok = true;
-									break;
-								}
-							}
+							let md5_str = calc_md5(&mut f , size).await;
 
 							match f.close().await{
 								Ok(_) => {},
@@ -892,16 +811,9 @@ pub async fn handle_cmd(ip : String , port : String){
 								},
 							};
 
-							if !is_ok {
+							if md5_str.len() == 0 {
 								println_err!("calc local file hash faild !");
 								continue;
-							}
-
-							let mut md5_str = String::new();
-
-							for b in md5.finalize(){
-								let a = format!("{:02x}", b);
-								md5_str += &a;
 							}
 
 							println_info!("local file hash : {}" , md5_str);

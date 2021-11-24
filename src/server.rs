@@ -1,14 +1,11 @@
-include!{"utils.rs"}
-
-use crate::common::{YaftpError, error_retcode};
-use std::{fs, io::{SeekFrom}, net::Shutdown, path::{Path}};
-
 use futures::{AsyncReadExt, AsyncWriteExt};
 use async_std::{fs::File, io::{self, prelude::SeekExt}, net::{TcpStream}};
 use chrono::DateTime;
 use chrono::offset::Utc;
 use path_absolutize::*;
-use md5::{Digest, Md5};
+
+use crate::{common::{YaftpError, error_retcode}, utils::{calc_md5, check_support_methods}};
+use std::{fs, io::{SeekFrom}, net::Shutdown, path::{Path}};
 
 async fn send_reply(stream :&mut  TcpStream , retcode : u8 , narg : u32) -> Result<Vec<u8>, YaftpError> {
 	/*
@@ -322,7 +319,7 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -339,7 +336,7 @@ async fn c_info(stream :&mut  TcpStream, narg : u32) {
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -482,7 +479,7 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -514,7 +511,7 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -529,7 +526,7 @@ async fn c_cp(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -599,7 +596,7 @@ async fn c_mkd(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -615,7 +612,7 @@ async fn c_mkd(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::AlreadyExists {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -685,7 +682,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -717,7 +714,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -732,7 +729,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -747,7 +744,7 @@ async fn c_mv(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -817,7 +814,7 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -832,7 +829,7 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -848,7 +845,7 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 					} else if e.kind() == std::io::ErrorKind::NotFound {
 						ret = error_retcode(YaftpError::NotFound);
 					} else {
-						print!("error : {}" , e);
+						log::error!("error : {}" , e);
 						ret = error_retcode(YaftpError::UnknownError);
 					}
 					break;
@@ -863,7 +860,7 @@ async fn c_rm(stream :&mut  TcpStream, narg : u32){
 					} else if e.kind() == std::io::ErrorKind::NotFound {
 						ret = error_retcode(YaftpError::NotFound);
 					} else {
-						print!("error : {}" , e);
+						log::error!("error : {}" , e);
 						ret = error_retcode(YaftpError::UnknownError);
 					}
 					break;
@@ -949,7 +946,7 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -969,7 +966,7 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 					} else if e.kind() == std::io::ErrorKind::NotFound {
 						ret = error_retcode(YaftpError::NotFound);
 					} else {
-						print!("error : {}" , e);
+						log::error!("error : {}" , e);
 						ret = error_retcode(YaftpError::UnknownError);
 					}
 					break;
@@ -984,7 +981,7 @@ async fn c_put(stream :&mut  TcpStream, narg : u32){
 					} else if e.kind() == std::io::ErrorKind::NotFound {
 						ret = error_retcode(YaftpError::NotFound);
 					} else {
-						print!("error : {}" , e);
+						log::error!("error : {}" , e);
 						ret = error_retcode(YaftpError::UnknownError);
 					}
 					break;
@@ -1127,7 +1124,7 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -1144,7 +1141,7 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -1191,7 +1188,7 @@ async fn c_get(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -1264,14 +1261,14 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
 			},
 		};
 
-		let mut f = match async_std::fs::File::open(&*path).await{
+		let mut f = match async_std::fs::File::open(path.to_str().unwrap().to_string()).await{
 			Ok(p) => p,
 			Err(e) => {
 				if e.kind() == std::io::ErrorKind::PermissionDenied {
@@ -1279,7 +1276,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 				} else if e.kind() == std::io::ErrorKind::NotFound {
 					ret = error_retcode(YaftpError::NotFound);
 				} else {
-					print!("error : {}" , e);
+					log::error!("error : {}" , e);
 					ret = error_retcode(YaftpError::UnknownError);
 				}
 				break;
@@ -1291,51 +1288,13 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 			break;
 		}
 
-		let mut md5 = Md5::default();
-
-		let mut buffer = vec![0u8 ; 1024 * 1024 * 20].into_boxed_slice();
-		
-		let mut sum : u64 = 0;
-		loop{
-
-			if (end_pos - sum) <= 1024 * 1024 * 20 {
-
-				let mut last_buf = vec![0u8; (end_pos - sum) as usize].into_boxed_slice();
-				match f.read_exact(&mut last_buf).await {
-					Ok(n) => n,
-					Err(_) => {
-						ret = error_retcode(YaftpError::ReadFileError);
-						break;
-					},
-				};
-
-				md5.update(&last_buf);
-
-				break;
-			}
-
-			let n = match f.read(&mut buffer).await {
-				Ok(n) => n,
-				Err(_) => {
-					ret = error_retcode(YaftpError::ReadFileError);
-					break;
-				},
-			};
-			sum += n as u64;
-			md5.update(&buffer[..n]);
-
-			if n == 0 {
-				break;
-			}
-		}
+		let md5_str = calc_md5(&mut f , end_pos).await;
 
 		f.close().await.unwrap();
 
-		let mut md5_str = String::new();
-
-		for b in md5.finalize(){
-			let a = format!("{:02x}", b);
-			md5_str += &a;
+		if md5_str.len() == 0 {
+			ret = error_retcode(YaftpError::CalcMd5Error);
+			break;
 		}
 
 		if ret == error_retcode(YaftpError::OK){

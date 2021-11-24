@@ -1,10 +1,9 @@
-include!("utils.rs");
-
-use std::{io::{Error, SeekFrom}, net::Shutdown};
-use crate::common::{YaftpError, retcode_error};
 use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use async_std::{fs::{self, File}, net::{TcpStream}};
 use indicatif::{ProgressBar, ProgressStyle};
+
+use std::{io::{Error, SeekFrom}, net::Shutdown};
+use crate::{common::{YaftpError, retcode_error}, println_err, println_info, utils::*};
 
 pub struct Client {
 	conn : TcpStream
