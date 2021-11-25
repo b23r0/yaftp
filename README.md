@@ -5,7 +5,6 @@ Support with resume broken transfer & reverse mode & largefile.
 
 # Features
 
-* C2C
 * Lightweight
 * Per something per session
 * Support large file
