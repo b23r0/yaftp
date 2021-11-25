@@ -305,6 +305,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 			println!("mkdir [path]                  - make directory");
 			println!("get   [remote path]           - download a file to local");
 			println!("put   [local path]            - upload a file to remote work directory");
+			println!("cat   [remote path]           - read a file and print content");
 			println!("-----------------------------------------------------------------------------------");
 			continue;
 		}
@@ -610,6 +611,62 @@ pub async fn handle_cmd(spawn : SpawnClient){
 				},
 			};
 
+		}
+
+		if cmd[0] == "cat" {
+			if cmd.len() != 2{
+				println_err!("command 'cat' need 1 argument . eg : cat /var/folder1/file2");
+				continue;
+			}
+
+			let path = pre_handle_path(&cmd[1], &cwd);
+
+			if path.len() == 0{
+				continue;
+			}
+
+			let mut client = match spawn.spawn().await{
+				Ok(p) => p,
+				Err(e) => {
+					println_err!("connect error : {}", e);
+					continue;
+				},
+			};
+
+			let (info, abspath) = match client.info(&path).await{
+				Ok(p) => p,
+				Err(e) => {
+                    println_err!("read file infomation faild : {}" , e);
+					continue;
+				},
+			};
+
+			if info[0] != 1 {
+				println_err!("'{}' not a file" , abspath);
+				continue;
+			}
+
+			if info[1] > 1024 * 100 {
+				println_err!("'{}' file size > 100kb , command cat cant read" , abspath);
+				continue;
+			}
+
+			let mut client = match spawn.spawn().await{
+				Ok(p) => p,
+				Err(e) => {
+					println_err!("connect error : {}", e);
+					continue;
+				},
+			};
+
+			match client.cat(&path).await{
+				Ok(p) => {
+					println!("{}" , p);
+				},
+				Err(_) => {
+					continue;
+				},
+			};
 		}
 
 		if cmd[0] == "get" {

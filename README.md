@@ -5,8 +5,11 @@ Support with resume broken transfer & reverse mode & largefile.
 
 # Features
 
-* Lightweight
+* Async-std
+* No unsafe code
+* Lightweight(Single executable)
 * Per something per session
+* Linux/Windows/Mac/BSD support
 * Support large file
 * Support Resume broken transfer
 * Support reverse mode(cross firewall)

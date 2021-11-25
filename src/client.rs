@@ -898,4 +898,88 @@ impl Client {
 	
 		Ok(ret)
 	}
+
+	pub async fn cat(self : &mut Client , remotepath : &String) -> Result<String,YaftpError> {
+
+		match self.handshake().await{
+			Ok(_) => {},
+			Err(e) => {
+				println_err!("yaftp handshake error");
+				return Err(e);
+			},
+		};
+
+		match self.send_command(8u8, 2).await{
+			Ok(_) => {},
+			Err(e) => {
+				println_err!("yaftp send command error");
+				return Err(e);
+			},
+		};
+
+		match self.send_argument(&mut remotepath.as_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println_err!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		let start_pos : u64 = 0 ;
+
+		match self.send_argument(&mut start_pos.to_be_bytes().to_vec()).await{
+			Ok(_) => {},
+			Err(e) => {
+				println_err!("yaftp send argument error");
+				return Err(e);
+			},
+		};
+
+		let _ = match self.read_reply().await{
+			Ok(p) => p,
+			Err(e) => {
+				println_err!("server error code : {}" , e);
+				return Err(e);
+			},
+		};
+	
+		/*
+		+-----------------+---------------------+
+		| NEXT_ARG_SIZE   |       ARG           |
+		+-----------------+---------------------+
+		|     8(u64)      |    Variable         |
+		+-----------------+---------------------+
+		*/
+
+		let mut argument_size = [0u8;8];
+		match self.conn.read_exact(&mut argument_size).await{
+			Ok(_) => {},
+			Err(_) => {
+				println_err!("read file size faild!");
+				return Err(YaftpError::UnknownNetwordError);
+			},
+		};
+
+		let size = u64::from_be_bytes(argument_size);
+
+		let mut buf = vec![0u8 ; size as usize].into_boxed_slice();
+
+		match self.conn.read_exact(&mut buf).await{
+			Ok(_) => {},
+			Err(_) => {
+				println_err!("read file faild!");
+				return Err(YaftpError::UnknownNetwordError);
+			},
+		};
+
+		let ret = match String::from_utf8(buf.to_vec()){
+			Ok(p) => p,
+			Err(_) => {
+				println_err!("format argument to utf8 string faild!");
+				return Err(YaftpError::UTF8FormatError);
+			},
+		};
+
+		Ok(ret.clone())
+	}
 }
