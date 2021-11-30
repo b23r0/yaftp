@@ -38,7 +38,7 @@ impl SpawnClient {
 
 	pub async fn spawn(self : &SpawnClient) -> Result<Client , Error> {
 
-		if self.ip.len() == 0 {
+		if self.ip.is_empty() {
 			self.master.as_ref().unwrap().write_all(&mut [0x55].to_vec()).await?;
 			let (stream , _) = self.slave.as_ref().unwrap().accept().await?;
 
@@ -58,11 +58,11 @@ impl Client {
 			Err(e) => return Err(e),
 		};
 		
-		return Ok(Client{conn : conn});
+		Ok(Client{conn})
 	}
 
 	pub async fn from(conn : TcpStream) -> Result<Client , Error> {
-		return Ok(Client{conn : conn});
+		Ok(Client{conn})
 	}
 
 	async fn handshake(self : &mut Client) -> Result<Vec<u8> , YaftpError>{
@@ -447,11 +447,11 @@ impl Client {
 
 		match self.read_reply().await{
 			Ok(p) => {
-				return Ok(p);
+				Ok(p)
 			},
 			Err(e) => {
 				println_err!("server error code : {}" , e);
-				return Err(e);
+				Err(e)
 			},
 		}
 	}
@@ -492,11 +492,11 @@ impl Client {
 
 		match self.read_reply().await{
 			Ok(p) => {
-				return Ok(p);
+				Ok(p)
 			},
 			Err(e) => {
 				println_err!("server error code : {}" , e);
-				return Err(e);
+				Err(e)
 			},
 		}
 	}
@@ -529,11 +529,11 @@ impl Client {
 
 		match self.read_reply().await{
 			Ok(p) => {
-				return Ok(p);
+				Ok(p)
 			},
 			Err(e) => {
 				println_err!("server error code : {}" , e);
-				return Err(e);
+				Err(e)
 			},
 		}
 	}
@@ -566,11 +566,11 @@ impl Client {
 
 		match self.read_reply().await{
 			Ok(p) => {
-				return Ok(p);
+				Ok(p)
 			},
 			Err(e) => {
 				println_err!("server error code : {}" , e);
-				return Err(e);
+				Err(e)
 			},
 		}
 	}
@@ -980,6 +980,6 @@ impl Client {
 			},
 		};
 
-		Ok(ret.clone())
+		Ok(ret)
 	}
 }

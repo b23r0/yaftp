@@ -1292,7 +1292,7 @@ async fn c_hash(stream :&mut  TcpStream, narg : u32){
 
 		f.close().await.unwrap();
 
-		if md5_str.len() == 0 {
+		if md5_str.is_empty() {
 			ret = error_retcode(YaftpError::CalcMd5Error);
 			break;
 		}

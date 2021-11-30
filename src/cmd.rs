@@ -80,7 +80,7 @@ struct TokenSt{
 
 impl Clone for TokenSt {
 	fn clone(&self) -> Self {
-		Self { t: self.t.clone(), v: self.v.clone() }
+		Self { t: self.t.clone(), v: self.v }
 	}
 }
 
@@ -126,7 +126,7 @@ fn eat(s : Vec<TokenSt> , end : Vec<Token>) -> (String , u8) {
 		return ( String::from_utf8(ret).unwrap() , 1 ) ;
 	}
 
-	return ( String::from_utf8(ret).unwrap() , 0 ) ;
+	( String::from_utf8(ret).unwrap() , 0 )
 }
 
 fn parser(s : Vec<TokenSt>) -> Result<Vec<String> , CmdError> {
@@ -190,7 +190,7 @@ fn pre_handle_path (path : &String , cwd : &String) -> String{
 
 	let mut cdpath : String;
 
-	let is_windows = cwd.as_bytes()[0] != '/' as u8;
+	let is_windows = cwd.as_bytes()[0] != b'/';
 
 	if path == ".."{
 
@@ -213,7 +213,7 @@ fn pre_handle_path (path : &String , cwd : &String) -> String{
 
 			cdpath = cwd.split_at(pos).0.to_string();
 
-			if cdpath.len() == 0 {
+			if cdpath.is_empty() {
 				cdpath = "/".to_string();
 			}
 		}
@@ -223,12 +223,10 @@ fn pre_handle_path (path : &String , cwd : &String) -> String{
 		loop {
 
 			if is_windows {
-				if path.len() > 1 {
-					if path.as_bytes()[1] == ':' as u8 {
-						cdpath = path.clone();
-						break;
-					} 
-				}
+				if path.len() > 1 && path.as_bytes()[1] == b':' {
+    						cdpath = path.clone();
+    						break;
+    					}
 
 				if cwd.len() == 3 {
 					cdpath = cwd.clone() + &path.clone();
@@ -236,7 +234,7 @@ fn pre_handle_path (path : &String , cwd : &String) -> String{
 					cdpath = [cwd.clone() , path.clone()].join("\\");
 				}
 			} else {
-				if path.as_bytes()[0] == '/' as u8{
+				if path.as_bytes()[0] == b'/'{
 					cdpath = path.clone();
 					break;
 				}
@@ -289,7 +287,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 			},
 		};
 
-		if cmd.len() == 0{
+		if cmd.is_empty(){
 			continue;
 		}
 
@@ -335,7 +333,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 			let mut files : Vec<FileInfo> = vec![];
 
 			for i in result {
-				let col : Vec<&str> = i.split("|").collect();
+				let col : Vec<&str> = i.split('|').collect();
 				files.push(FileInfo{name : col[0].to_string() , typ : col[1].to_string() , size : col[2].to_string() , modified : col[3].to_string() , accesstime : col[4].to_string()});
 			}
 
@@ -355,7 +353,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let cdpath = pre_handle_path(&cmd[1], &cwd);
 
-			if cdpath.len() == 0{
+			if cdpath.is_empty(){
 				continue;
 			}
 
@@ -391,13 +389,13 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let srcpath = pre_handle_path(&cmd[1], &cwd);
 
-			if srcpath.len() == 0{
+			if srcpath.is_empty(){
 				continue;
 			}
 
 			let targetpath = pre_handle_path(&cmd[2], &cwd);
 
-			if targetpath.len() == 0{
+			if targetpath.is_empty(){
 				continue;
 			}
 
@@ -449,7 +447,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let path = pre_handle_path(&cmd[1], &cwd);
 
-			if path.len() == 0{
+			if path.is_empty(){
 				continue;
 			}
 
@@ -480,14 +478,14 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let srcpath = pre_handle_path(&cmd[1], &cwd);
 
-			if srcpath.len() == 0{
+			if srcpath.is_empty(){
                 println_err!("command error , please check argument format");
 				continue;
 			}
 
 			let targetpath = pre_handle_path(&cmd[2], &cwd);
 
-			if targetpath.len() == 0{
+			if targetpath.is_empty(){
                 println_err!("command error , please check argument format");
 				continue;
 			}
@@ -539,7 +537,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let path = pre_handle_path(&cmd[1], &cwd);
 
-			if path.len() == 0{
+			if path.is_empty(){
 				continue;
 			}
 
@@ -569,7 +567,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let path = pre_handle_path(&cmd[1], &cwd);
 
-			if path.len() == 0{
+			if path.is_empty(){
 				continue;
 			}
 
@@ -621,7 +619,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let path = pre_handle_path(&cmd[1], &cwd);
 
-			if path.len() == 0{
+			if path.is_empty(){
 				continue;
 			}
 
@@ -677,7 +675,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let path = pre_handle_path(&cmd[1], &cwd);
 
-			if path.len() == 0{
+			if path.is_empty(){
 				continue;
 			}
 
@@ -704,7 +702,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let filename : String;
 
-			if path.as_bytes()[0] == '/' as u8 {
+			if path.as_bytes()[0] == b'/' {
 				filename = path.split_at(path.rfind('/').unwrap() + 1).1.to_string();
 			} else {
 				filename = path.split_at(path.rfind('\\').unwrap() + 1).1.to_string();
@@ -752,7 +750,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 								},
 							};
 
-							if md5_str.len() == 0 {
+							if md5_str.is_empty() {
 								println_err!("calc local file hash faild !");
 								continue;
 							}
@@ -824,7 +822,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let filename : String;
 
-			if cmd[1].as_bytes()[0] == '/' as u8 {
+			if cmd[1].as_bytes()[0] == b'/' {
 				filename = localpath.split_at(localpath.rfind('/').unwrap() + 1).1.to_string();
 			} else {
 				filename = localpath.split_at(localpath.rfind('\\').unwrap() + 1).1.to_string();
@@ -832,7 +830,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 
 			let remotepath = pre_handle_path(&filename, &cwd);
 
-			if localpath.len() == 0{
+			if localpath.is_empty(){
 				continue;
 			}
 
@@ -884,7 +882,7 @@ pub async fn handle_cmd(spawn : SpawnClient){
 								},
 							};
 
-							if md5_str.len() == 0 {
+							if md5_str.is_empty() {
 								println_err!("calc local file hash faild !");
 								continue;
 							}
