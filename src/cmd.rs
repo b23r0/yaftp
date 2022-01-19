@@ -823,9 +823,27 @@ pub async fn handle_cmd(spawn : SpawnClient){
 			let filename : String;
 
 			if cmd[1].as_bytes()[0] == b'/' {
-				filename = localpath.split_at(localpath.rfind('/').unwrap() + 1).1.to_string();
+				let pos = match localpath.rfind('/'){
+					Some(p) => {
+						p
+					},
+					None => {
+						println_err!("command 'put' need 1 argument . eg : put /localfile/file1");
+						continue;
+					}
+				};
+				filename = localpath.split_at(pos + 1).1.to_string();
 			} else {
-				filename = localpath.split_at(localpath.rfind('\\').unwrap() + 1).1.to_string();
+				let pos = match localpath.rfind('\\'){
+					Some(p) => {
+						p
+					},
+					None => {
+						println_err!("command 'put' need 1 argument . eg : put /localfile/file1");
+						continue;
+					}
+				};
+				filename = localpath.split_at(pos + 1).1.to_string();
 			}
 
 			let remotepath = pre_handle_path(&filename, &cwd);
