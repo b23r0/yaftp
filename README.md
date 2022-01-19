@@ -44,6 +44,10 @@ then reverse connect to master in slave
 
 `$> ./yaftp -r 127.0.0.1 8000`
 
+# Example
+
+![image]( https://github.com/b23r0/yaftp/blob/main/example/yaftp.gif)
+
 # Protocol(v1)
 
 ## Data Type
